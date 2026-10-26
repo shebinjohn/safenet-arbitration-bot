@@ -101,82 +101,80 @@ var callKinds = []string{Root: "root", Batched: "batched", Refund: "refund"}
 // Charter covers, which they are deployed on. An address without code isn't
 // identified.
 func Calls(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*TransactionCalls, error) {
-	tx := &request.Proposal.Transaction
-	components, err := components(tx)
+	// A malformed transaction is an error before anything is read.
+	if _, err := components(&request.Proposal.Transaction); err != nil {
+		return nil, err
+	}
+	r, err := NewCallReader(ctx, dial, request)
 	if err != nil {
 		return nil, err
 	}
-	if !tx.ChainID.IsUint64() {
+	return r.Calls(ctx, &request.Proposal.Transaction)
+}
+
+// CallReader reads the calls of Safe transactions of the Safe of a request, as
+// Calls does, such as those that the Safe executed before the proposal, as of
+// the proposal's SafeBlock. It reads each account once, so that it can read
+// many transactions.
+type CallReader struct {
+	client  *ethrpc.Client
+	block   ethrpc.BlockNumber
+	safe    ethrpc.Address
+	chainID uint64
+	covered bool
+	codes   map[ethrpc.Address]ethrpc.Bytes
+	// safeAccount is the Safe, once read.
+	safeAccount *SafeAccount
+}
+
+// NewCallReader returns a reader of the calls of the Safe of request, on the
+// Safe's chain at the proposal's SafeBlock, connecting with dial.
+func NewCallReader(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*CallReader, error) {
+	tx := &request.Proposal.Transaction
+	if tx.ChainID == nil || !tx.ChainID.IsUint64() {
 		return nil, errors.New("safe transaction has an invalid chainId")
 	}
 	if request.Proposal.SafeBlock == 0 {
 		return nil, errors.New("proposal has no safeBlock")
 	}
 	chainID := tx.ChainID.Uint64()
-	covered := slices.Contains(networks, chainID)
 	client, err := dial(ctx, chainID)
 	if err != nil {
 		return nil, err
 	}
-	block := ethrpc.BlockNumber(request.Proposal.SafeBlock)
+	return &CallReader{
+		client:  client,
+		block:   ethrpc.BlockNumber(request.Proposal.SafeBlock),
+		safe:    tx.Safe,
+		chainID: chainID,
+		covered: slices.Contains(networks, chainID),
+		codes:   map[ethrpc.Address]ethrpc.Bytes{},
+	}, nil
+}
 
-	codes := map[ethrpc.Address]ethrpc.Bytes{}
-	code := func(address ethrpc.Address) (ethrpc.Bytes, error) {
-		if c, ok := codes[address]; ok {
-			return c, nil
-		}
-		c, err := client.GetCode(ctx, address, block)
-		if err != nil {
-			return nil, err
-		}
-		codes[address] = c
-		return c, nil
-	}
-
-	safeCode, err := code(tx.Safe)
+// Calls returns the calls that tx makes, as the package-level Calls returns
+// those of a request's transaction. tx must be a transaction of the reader's
+// Safe, on its chain.
+func (r *CallReader) Calls(ctx context.Context, tx *safenet.SafeTransaction) (*TransactionCalls, error) {
+	components, err := components(tx)
 	if err != nil {
 		return nil, err
 	}
-	slot0, err := client.GetStorageAt(ctx, tx.Safe, ethrpc.Hash{}, block)
+	if tx.Safe != r.safe || !tx.ChainID.IsUint64() || tx.ChainID.Uint64() != r.chainID {
+		return nil, errors.New("safe transaction is for another Safe or chain")
+	}
+	safe, err := r.safeOf(ctx)
 	if err != nil {
 		return nil, err
 	}
-	singleton := ethrpc.Address(slot0[12:])
-	safe := SafeAccount{
-		Address:      tx.Safe,
-		CodeHash:     ethrpc.Hash(keccak256.Hash(safeCode)),
-		CodeSize:     len(safeCode),
-		ProxyVersion: optional(proxyVersion(safeCode, chainID)),
-		Singleton:    singleton,
-	}
-	if covered {
-		safe.SingletonVersion = optional(singletons[singleton])
-	}
 
-	account := func(address ethrpc.Address) (Account, error) {
-		c, err := code(address)
-		if err != nil {
-			return Account{}, err
-		}
-		a := Account{
-			Address:  address,
-			CodeHash: ethrpc.Hash(keccak256.Hash(c)),
-			CodeSize: len(c),
-			Self:     address == tx.Safe,
-		}
-		if covered && len(c) > 0 {
-			a.Contract = contractAt(address)
-		}
-		return a, nil
-	}
-
-	report := &TransactionCalls{ChainID: chainID, SafeBlock: request.Proposal.SafeBlock, Safe: safe, Calls: []Call{}}
-	if report.Target, err = account(tx.To); err != nil {
+	report := &TransactionCalls{ChainID: r.chainID, SafeBlock: uint64(r.block), Safe: *safe, Calls: []Call{}}
+	if report.Target, err = r.account(ctx, tx.To); err != nil {
 		return nil, err
 	}
 	own := call{to: tx.To, value: tx.Value, data: tx.Data, operation: tx.Operation, kind: Root}
 	for _, c := range components.calls {
-		to, err := account(c.to)
+		to, err := r.account(ctx, c.to)
 		if err != nil {
 			return nil, err
 		}
@@ -196,6 +194,65 @@ func Calls(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*
 		report.Calls = append(report.Calls, reported)
 	}
 	return report, nil
+}
+
+// code returns the code of address, reading it once.
+func (r *CallReader) code(ctx context.Context, address ethrpc.Address) (ethrpc.Bytes, error) {
+	if c, ok := r.codes[address]; ok {
+		return c, nil
+	}
+	c, err := r.client.GetCode(ctx, address, r.block)
+	if err != nil {
+		return nil, err
+	}
+	r.codes[address] = c
+	return c, nil
+}
+
+// safeOf returns the reader's Safe, reading it once.
+func (r *CallReader) safeOf(ctx context.Context) (*SafeAccount, error) {
+	if r.safeAccount != nil {
+		return r.safeAccount, nil
+	}
+	safeCode, err := r.code(ctx, r.safe)
+	if err != nil {
+		return nil, err
+	}
+	slot0, err := r.client.GetStorageAt(ctx, r.safe, ethrpc.Hash{}, r.block)
+	if err != nil {
+		return nil, err
+	}
+	singleton := ethrpc.Address(slot0[12:])
+	safe := &SafeAccount{
+		Address:      r.safe,
+		CodeHash:     ethrpc.Hash(keccak256.Hash(safeCode)),
+		CodeSize:     len(safeCode),
+		ProxyVersion: optional(proxyVersion(safeCode, r.chainID)),
+		Singleton:    singleton,
+	}
+	if r.covered {
+		safe.SingletonVersion = optional(singletons[singleton])
+	}
+	r.safeAccount = safe
+	return safe, nil
+}
+
+// account returns an account that the Safe calls.
+func (r *CallReader) account(ctx context.Context, address ethrpc.Address) (Account, error) {
+	c, err := r.code(ctx, address)
+	if err != nil {
+		return Account{}, err
+	}
+	a := Account{
+		Address:  address,
+		CodeHash: ethrpc.Hash(keccak256.Hash(c)),
+		CodeSize: len(c),
+		Self:     address == r.safe,
+	}
+	if r.covered && len(c) > 0 {
+		a.Contract = contractAt(address)
+	}
+	return a, nil
 }
 
 // contractAt returns the contract of a § 2.1 version at address, if any.

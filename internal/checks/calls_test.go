@@ -207,6 +207,41 @@ func TestCallsFunction(t *testing.T) {
 	}
 }
 
+// TestCallReader checks that a reader reads the calls of several transactions
+// of the Safe, and refuses those of another Safe.
+func TestCallReader(t *testing.T) {
+	safe := ethrpc.Address{0: 0x5a, 19: 0x01}
+	token := ethrpc.Address{0: 0x70, 19: 0x01}
+	node := &fakeNode{accounts: map[ethrpc.Address]account{
+		safe:  proxy(safeProxy100, singletonOf("1.4.1")),
+		token: {code: ethrpc.Bytes{0x60, 0x80}},
+	}}
+	r := request(safenet.SafeTransaction{Safe: safe, To: token})
+	reader, err := NewCallReader(t.Context(), node.dialer(t, testSafeBlock), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, data := range []ethrpc.Bytes{
+		solabi.Call(solabi.Selector("transfer(address,uint256)"), safe, big.NewInt(1)),
+		solabi.Call(solabi.Selector("approve(address,uint256)"), safe, big.NewInt(2)),
+	} {
+		tx := r.Proposal.Transaction
+		tx.Data = data
+		got, err := reader.Calls(t.Context(), &tx)
+		if err != nil {
+			t.Fatalf("transaction %d: %v", i, err)
+		}
+		if got.Safe.ProxyVersion == nil || len(got.Calls) != 1 || got.Calls[0].To.Address != token || got.Calls[0].Function == nil {
+			t.Errorf("transaction %d: got %+v, want the Safe and one decoded call to the token", i, got)
+		}
+	}
+	other := r.Proposal.Transaction
+	other.Safe = token
+	if _, err := reader.Calls(t.Context(), &other); err == nil || !strings.Contains(err.Error(), "another Safe") {
+		t.Errorf("transaction of another Safe: got error %v, want one about another Safe", err)
+	}
+}
+
 func TestCallsErrors(t *testing.T) {
 	missingGasPrice := request(safenet.SafeTransaction{})
 	missingGasPrice.Proposal.Transaction.GasPrice = nil

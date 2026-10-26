@@ -92,6 +92,16 @@ func TestDecode(t *testing.T) {
 				Arg{"signatures", "bytes", ethrpc.Bytes("sig")}, Arg{"additionalInfo", "bytes", ethrpc.Bytes("info")},
 			)},
 		},
+		{
+			"Safe 1.3.0 ProxyCreation",
+			log("ProxyCreation(address,address)", nil, solabi.Encode(alice, bob)),
+			&Event{"ProxyCreation", "ProxyCreation(address,address)", args(Arg{"proxy", "address", alice}, Arg{"singleton", "address", bob})},
+		},
+		{
+			"Safe 1.4.1 ProxyCreation",
+			log("ProxyCreation(address,address)", []ethrpc.Hash{word(alice)}, solabi.Encode(bob)),
+			&Event{"ProxyCreation", "ProxyCreation(address,address)", args(Arg{"proxy", "address", alice}, Arg{"singleton", "address", bob})},
+		},
 	}
 	for _, test := range tests {
 		got := Decode(test.log)
@@ -139,5 +149,15 @@ func TestDefinitionsHaveUniqueLayouts(t *testing.T) {
 			}
 			seen[indexed] = true
 		}
+	}
+}
+
+// TestProxyCreationTopic checks the topic of ProxyCreation against the one that
+// the Safe 1.4.1 proxy factory on Ethereum Mainnet,
+// 0x4e1DCf7AD4e460CfD30791CCC4F9C8a4f820ec67, logs.
+func TestProxyCreationTopic(t *testing.T) {
+	want := ethrpc.MustParseHash("0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235")
+	if got := solabi.Event("ProxyCreation(address,address)"); got != want {
+		t.Errorf("ProxyCreation topic: got %s, want %s", got, want)
 	}
 }

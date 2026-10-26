@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
 )
 
 // defaultScanBlocks is how many blocks before the Safe block that the commands
@@ -22,6 +23,8 @@ type safeRef struct {
 	// SafeBlock is the request's Safe block.
 	SafeBlock uint64
 	eth       *ethrpc.Client
+	// request is the request, as the file has it.
+	request *safenet.Request
 }
 
 // openSafe reads the request in the file at requestFile, as written by arbot
@@ -41,7 +44,7 @@ func openSafe(ctx context.Context, e *env, requestFile string) (*safeRef, error)
 	if tx.ChainID == nil || !tx.ChainID.IsUint64() || request.Proposal.SafeBlock == 0 {
 		return nil, fmt.Errorf("request in %s has no Safe chain ID or block", requestFile)
 	}
-	s := &safeRef{Safe: tx.Safe, ChainID: tx.ChainID.Uint64(), SafeBlock: request.Proposal.SafeBlock}
+	s := &safeRef{Safe: tx.Safe, ChainID: tx.ChainID.Uint64(), SafeBlock: request.Proposal.SafeBlock, request: request}
 	if s.eth, err = ethrpc.NewDialer(e.cfg.RPCs)(ctx, s.ChainID); err != nil {
 		return nil, err
 	}

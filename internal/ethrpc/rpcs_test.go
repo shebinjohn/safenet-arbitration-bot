@@ -108,11 +108,15 @@ func TestNewClientTriesDefaultRPCsInOrder(t *testing.T) {
 	if client.url != good {
 		t.Errorf("NewClient: picked %s, want %s", client.url, good)
 	}
+	// The failing node's 503 is retried until the connect timeout runs out, so it
+	// can get more than one request.
+	if n := failingRequests.Load(); n < 1 {
+		t.Errorf("failing node requests: got %d, want at least 1", n)
+	}
 	for name, tc := range map[string]struct {
 		requests *atomic.Int64
 		want     int64
 	}{
-		"failing":     {failingRequests, 1},
 		"wrong chain": {wrongChainRequests, 1},
 		"good":        {goodRequests, 1},
 		"unused":      {unusedRequests, 0},

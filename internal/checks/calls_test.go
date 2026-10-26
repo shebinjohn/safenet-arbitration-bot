@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/functions"
 	"github.com/safe-research/safenet-arbitration-bot/internal/keccak256"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
 	"github.com/safe-research/safenet-arbitration-bot/internal/solabi"
@@ -167,6 +168,11 @@ func TestCalls(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Each call has its data decoded as a well-known function, which the functions
+			// package tests.
+			for i := range test.calls {
+				test.calls[i].Function = functions.Decode(test.calls[i].Data)
+			}
 			want := &TransactionCalls{
 				ChainID: r.Proposal.Transaction.ChainID.Uint64(), SafeBlock: testSafeBlock,
 				Safe: test.safe, Target: test.target, Calls: test.calls,
@@ -179,6 +185,25 @@ func TestCalls(t *testing.T) {
 				t.Errorf("Calls():\ngot  %s\nwant %s", g, w)
 			}
 		})
+	}
+}
+
+// TestCallsFunction checks that the calls have their data decoded as a
+// well-known function.
+func TestCallsFunction(t *testing.T) {
+	safe := ethrpc.Address{0: 0x5a, 19: 0x01}
+	token := ethrpc.Address{0: 0x70, 19: 0x01}
+	node := &fakeNode{accounts: map[ethrpc.Address]account{
+		safe:  proxy(safeProxy100, singletonOf("1.4.1")),
+		token: {code: ethrpc.Bytes{0x60, 0x80}},
+	}}
+	approve := solabi.Call(solabi.Selector("approve(address,uint256)"), safe, big.NewInt(5))
+	got, err := Calls(t.Context(), node.dialer(t, testSafeBlock), request(safenet.SafeTransaction{Safe: safe, To: token, Data: approve}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Calls) != 1 || got.Calls[0].Function == nil || got.Calls[0].Function.Name != "approve" {
+		t.Errorf("Calls: got %+v, want one call decoded as approve", got.Calls)
 	}
 }
 

@@ -204,3 +204,55 @@ func TestExecutionsErrors(t *testing.T) {
 		t.Errorf("Executions from a service without the endpoint: got error %v, want ErrNotFound", err)
 	}
 }
+
+func TestTransfers(t *testing.T) {
+	safe := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000001")
+	token := ethrpc.MustParseAddress("0x7000000000000000000000000000000000000001")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if r.URL.Path != "/api/v1/safes/"+safe.String()+"/transfers/" || err != nil || r.URL.Query().Get("limit") != "100" {
+			http.NotFound(w, r)
+			return
+		}
+		// More than a page of ERC-20 transfers out, then a native transfer in, and an
+		// ERC-721 transfer without a value.
+		results := []map[string]any{}
+		for i := offset; i < min(102, offset+100); i++ {
+			result := map[string]any{
+				"type": "ERC20_TRANSFER", "blockNumber": 1000 + i, "transactionHash": ethrpc.Hash{31: byte(i)},
+				"tokenAddress": token, "from": safe, "to": ethrpc.Address{19: byte(i)}, "value": strconv.Itoa(i), "tokenId": nil,
+			}
+			switch i {
+			case 100:
+				result["type"], result["tokenAddress"], result["from"], result["to"] = "ETHER_TRANSFER", nil, ethrpc.Address{19: 1}, safe
+			case 101:
+				result["type"], result["value"], result["tokenId"] = "ERC721_TRANSFER", nil, "7"
+			}
+			results = append(results, result)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"count": 102, "results": results})
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := NewClient(server.URL, ethrpc.Mainnet).Transfers(t.Context(), safe)
+	if err != nil {
+		t.Fatalf("Transfers: %v", err)
+	}
+	if len(got) != 102 {
+		t.Fatalf("Transfers: got %d transfers, want 102", len(got))
+	}
+	if x := got[5]; x.Type != "ERC20_TRANSFER" || x.Block != 1005 || x.TxHash != (ethrpc.Hash{31: 5}) || x.Token == nil || *x.Token != token ||
+		x.From != safe || x.To != (ethrpc.Address{19: 5}) || x.Value.Int64() != 5 {
+		t.Errorf("Transfers[5]: got %+v, want an ERC-20 transfer of 5 in block 1005", x)
+	}
+	if x := got[100]; x.Type != "ETHER_TRANSFER" || x.Token != nil || x.To != safe || x.Value.Int64() != 100 {
+		t.Errorf("Transfers[100]: got %+v, want a native transfer of 100 to the Safe", x)
+	}
+	if x := got[101]; x.Type != "ERC721_TRANSFER" || x.Value != nil {
+		t.Errorf("Transfers[101]: got %+v, want an ERC-721 transfer without a value", x)
+	}
+
+	if _, err := serve(t, http.StatusOK, "").Transfers(t.Context(), safe); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Transfers from a service without the endpoint: got error %v, want ErrNotFound", err)
+	}
+}

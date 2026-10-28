@@ -77,11 +77,12 @@ type Execution struct {
 	Transaction *safenet.SafeTransaction
 }
 
-// executionsPageSize is the number of executions that Executions asks for in
-// each request, and maxExecutions bounds the number that it lists.
+// pageSize is the number of executions or transfers that Executions and
+// Transfers ask for in each request, and maxExecutions bounds the number of
+// executions that Executions lists.
 const (
-	executionsPageSize = 100
-	maxExecutions      = 100_000
+	pageSize      = 100
+	maxExecutions = 100_000
 )
 
 // Executions returns the Safe transactions of safe that the service lists as
@@ -93,7 +94,7 @@ func (c *Client) Executions(ctx context.Context, safe ethrpc.Address) ([]Executi
 		return nil, err
 	}
 	var executions []Execution
-	for offset := 0; ; offset += executionsPageSize {
+	for offset := 0; ; offset += pageSize {
 		if offset >= maxExecutions {
 			return nil, fmt.Errorf("the service lists more than %d executions", maxExecutions)
 		}
@@ -101,7 +102,7 @@ func (c *Client) Executions(ctx context.Context, safe ethrpc.Address) ([]Executi
 		// request is to the service.
 		query := url.Values{
 			"executed": {"true"}, "ordering": {"nonce"},
-			"limit": {strconv.Itoa(executionsPageSize)}, "offset": {strconv.Itoa(offset)},
+			"limit": {strconv.Itoa(pageSize)}, "offset": {strconv.Itoa(offset)},
 		}
 		var page struct {
 			Results []struct {
@@ -123,8 +124,67 @@ func (c *Client) Executions(ctx context.Context, safe ethrpc.Address) ([]Executi
 				Transaction: r.safeTransaction(c.chainID),
 			})
 		}
-		if len(page.Results) < executionsPageSize {
+		if len(page.Results) < pageSize {
 			return executions, nil
+		}
+	}
+}
+
+// Transfer is a transfer into or out of a Safe that the service lists.
+type Transfer struct {
+	// Type is the service's type of the transfer, such as "ERC20_TRANSFER",
+	// "ETHER_TRANSFER", or "ERC721_TRANSFER".
+	Type   string
+	Block  uint64
+	TxHash ethrpc.Hash
+	// Token is the token's contract, or nil for the native currency.
+	Token *ethrpc.Address
+	From  ethrpc.Address
+	To    ethrpc.Address
+	// Value is the amount in the token's or the currency's smallest unit, or nil
+	// for a transfer without one, such as of an ERC-721 token.
+	Value *big.Int
+}
+
+// maxTransfers bounds the number of transfers that Transfers lists.
+const maxTransfers = 100_000
+
+// Transfers returns the transfers into and out of safe that the service lists,
+// as it reports them: none of them are checked.
+func (c *Client) Transfers(ctx context.Context, safe ethrpc.Address) ([]Transfer, error) {
+	base, err := url.JoinPath(c.baseURL, "api", "v1", "safes", safe.String(), "transfers")
+	if err != nil {
+		return nil, err
+	}
+	var transfers []Transfer
+	for offset := 0; ; offset += pageSize {
+		if offset >= maxTransfers {
+			return nil, fmt.Errorf("the service lists more than %d transfers", maxTransfers)
+		}
+		query := url.Values{"limit": {strconv.Itoa(pageSize)}, "offset": {strconv.Itoa(offset)}}
+		var page struct {
+			Results []struct {
+				Type            string          `json:"type"`
+				BlockNumber     uint64          `json:"blockNumber"`
+				TransactionHash ethrpc.Hash     `json:"transactionHash"`
+				TokenAddress    *ethrpc.Address `json:"tokenAddress"`
+				From            ethrpc.Address  `json:"from"`
+				To              ethrpc.Address  `json:"to"`
+				Value           *number         `json:"value"`
+			} `json:"results"`
+		}
+		if err := c.get(ctx, base+"/?"+query.Encode(), &page); err != nil {
+			return nil, err
+		}
+		for _, r := range page.Results {
+			t := Transfer{Type: r.Type, Block: r.BlockNumber, TxHash: r.TransactionHash, Token: r.TokenAddress, From: r.From, To: r.To}
+			if r.Value != nil {
+				t.Value = r.Value.Int
+			}
+			transfers = append(transfers, t)
+		}
+		if len(page.Results) < pageSize {
+			return transfers, nil
 		}
 	}
 }

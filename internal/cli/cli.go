@@ -28,6 +28,7 @@ var commands = map[string]struct {
 	run         func(ctx context.Context, e *env, args []string) error
 	description string
 }{
+	"account":    {accountCommand, "show an account on the Safe's chain of a Safenet request, such as a recipient or a token"},
 	"calls":      {callsCommand, "list the calls that the Safe of a Safenet request makes, as the checks judge them"},
 	"charter":    {charter, "fetch the Safenet Arbitration Charter"},
 	"events":     {eventsCommand, "list the events that a transaction logged, on the Safe's chain of a Safenet request"},

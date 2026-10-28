@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -241,6 +242,41 @@ func TestGetCode(t *testing.T) {
 	}
 	if !bytes.Equal(code, []byte{0x60, 0x80}) {
 		t.Errorf("GetCode: got %s, want 0x6080", code)
+	}
+}
+
+func TestGetBalance(t *testing.T) {
+	client := serve(t,
+		`{"jsonrpc": "2.0", "method": "eth_getBalance", "params": ["0x00000000000000000000000000000000000000aa", "0x10"]}`,
+		`{"result": "0x1000000000000000000000000"}`,
+	)
+	balance, err := client.GetBalance(t.Context(), Address{19: 0xaa}, 16)
+	if err != nil {
+		t.Fatalf("GetBalance: %v", err)
+	}
+	if want, _ := new(big.Int).SetString("1000000000000000000000000", 16); balance.Cmp(want) != 0 {
+		t.Errorf("GetBalance: got %s, want %s", balance, want)
+	}
+
+	for _, result := range []string{`"1000"`, `"0x"`, `"0xg"`, `"0x-1"`, `16`} {
+		client := serve(t,
+			`{"jsonrpc": "2.0", "method": "eth_getBalance", "params": ["0x00000000000000000000000000000000000000aa", "0x10"]}`,
+			`{"result": `+result+`}`,
+		)
+		if _, err := client.GetBalance(t.Context(), Address{19: 0xaa}, 16); err == nil {
+			t.Errorf("GetBalance of %s: expected an error", result)
+		}
+	}
+}
+
+func TestGetTransactionCount(t *testing.T) {
+	client := serve(t,
+		`{"jsonrpc": "2.0", "method": "eth_getTransactionCount", "params": ["0x00000000000000000000000000000000000000aa", "0x10"]}`,
+		`{"result": "0x2a"}`,
+	)
+	nonce, err := client.GetTransactionCount(t.Context(), Address{19: 0xaa}, 16)
+	if err != nil || nonce != 42 {
+		t.Errorf("GetTransactionCount: got %d and error %v, want 42", nonce, err)
 	}
 }
 

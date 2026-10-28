@@ -10,7 +10,6 @@ import (
 	"github.com/safe-research/safenet-arbitration-bot/internal/checks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/executions"
-	"github.com/safe-research/safenet-arbitration-bot/internal/txservice"
 )
 
 // executionsReport is the JSON output of `arbot executions`.
@@ -120,15 +119,9 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	}
 
 	finder := &executions.Finder{
-		Eth:  ref.eth,
-		Warn: func(err error) { fmt.Fprintf(e.stderr, "%s: warning: %v\n", e.progname, err) },
-	}
-	baseURL, ok := e.cfg.TxServices[ref.ChainID]
-	if !ok {
-		baseURL = txservice.DefaultURLs[ref.ChainID]
-	}
-	if baseURL != "" {
-		finder.Service = txservice.NewClient(baseURL, ref.ChainID)
+		Eth:     ref.eth,
+		Service: txService(e, ref.ChainID),
+		Warn:    func(err error) { fmt.Fprintf(e.stderr, "%s: warning: %v\n", e.progname, err) },
 	}
 	report := executionsReport{Safe: ref.Safe, ChainID: ref.ChainID, FromBlock: fromBlock, ToBlock: ref.SafeBlock}
 	var found []executions.Execution

@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -105,6 +107,30 @@ func (c *Client) GetCode(ctx context.Context, address Address, block BlockNumber
 	var result Bytes
 	err := c.RawRequest(ctx, &result, "eth_getCode", address, block)
 	return result, err
+}
+
+// GetBalance returns the balance of address, in wei, as of block
+// (eth_getBalance).
+func (c *Client) GetBalance(ctx context.Context, address Address, block BlockNumber) (*big.Int, error) {
+	var result string
+	if err := c.RawRequest(ctx, &result, "eth_getBalance", address, block); err != nil {
+		return nil, err
+	}
+	digits, ok := strings.CutPrefix(result, "0x")
+	balance, valid := new(big.Int).SetString(digits, 16)
+	if !ok || digits == "" || !valid || balance.Sign() < 0 {
+		return nil, fmt.Errorf("eth_getBalance: invalid quantity %q", result)
+	}
+	return balance, nil
+}
+
+// GetTransactionCount returns the nonce of address, the number of transactions
+// that it sent, or contracts that it created if it is a contract, as of block
+// (eth_getTransactionCount).
+func (c *Client) GetTransactionCount(ctx context.Context, address Address, block BlockNumber) (uint64, error) {
+	var result Quantity
+	err := c.RawRequest(ctx, &result, "eth_getTransactionCount", address, block)
+	return uint64(result), err
 }
 
 // GetStorageAt returns the value of the storage slot of the contract at address

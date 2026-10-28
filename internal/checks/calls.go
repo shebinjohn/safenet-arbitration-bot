@@ -231,6 +231,13 @@ func (r *CallReader) safeOf(ctx context.Context) (*SafeAccount, error) {
 	return safe, nil
 }
 
+// Account returns the account at address as the calls that the reader decodes
+// have it: its code, whether it is the reader's Safe, and the contract of a
+// Safe version of § 2.1 that it is, if any.
+func (r *CallReader) Account(ctx context.Context, address ethrpc.Address) (Account, error) {
+	return r.account(ctx, address)
+}
+
 // account returns an account that the Safe calls.
 func (r *CallReader) account(ctx context.Context, address ethrpc.Address) (Account, error) {
 	c, err := r.code(ctx, address)

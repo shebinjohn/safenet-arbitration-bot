@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/e2e"
@@ -67,7 +70,7 @@ func TestTransfers(t *testing.T) {
 
 	// Transfers after the proposal, which the evidence must not include.
 	n.Mainnet.MineUntil(n.Header(r.Block).Time())
-	n.TransferFeeToken(n.Mainnet, safe, alice, ether(4))
+	later := n.TransferFeeToken(n.Mainnet, safe, alice, ether(4))
 	n.TransferFeeToken(n.Mainnet, alice, safe, ether(9))
 
 	arbot := n.Arbot()
@@ -130,6 +133,138 @@ func TestTransfers(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("all", func(t *testing.T) {
+		// A service that lists the first two transfers out of the Safe, one that the
+		// logs don't have, and one after the proposal, and the transfers into it.
+		type listing struct {
+			kind     string
+			receipt  *e2e.Receipt
+			token    *ethrpc.Address
+			from, to ethrpc.Address
+			value    *big.Int
+		}
+		listings := []listing{
+			{"ERC20_TRANSFER", first, &token, safe, alice, ether(1)},
+			{"ERC20_TRANSFER", first, &token, safe, bob, ether(1)},
+			{"ERC20_TRANSFER", second, &token, safe, bob, ether(2)},
+			{"ERC20_TRANSFER", later, &token, safe, alice, ether(4)},
+			{"ERC20_TRANSFER", tokenIn, &token, alice, safe, ether(6)},
+			{"ETHER_TRANSFER", etherIn, nil, bob, safe, ether(7)},
+		}
+		service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/api/v1/safes/"+safe.String()+"/transfers/" {
+				http.NotFound(w, r)
+				return
+			}
+			results := []map[string]any{}
+			for _, l := range listings {
+				results = append(results, map[string]any{
+					"type": l.kind, "blockNumber": uint64(l.receipt.BlockNumber), "transactionHash": l.receipt.TransactionHash,
+					"tokenAddress": l.token, "from": l.from, "to": l.to, "value": l.value.String(),
+				})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"count": len(results), "results": results})
+		}))
+		t.Cleanup(service.Close)
+		withService := arbot.WithTxService(t, ethrpc.Mainnet, service.URL)
+
+		type serviceJSON struct {
+			Listed    int `json:"listed"`
+			Blocks    int `json:"blocks"`
+			Unmatched int `json:"unmatched"`
+		}
+		type allOutput struct {
+			transfersOutput
+			Service *serviceJSON `json:"service"`
+		}
+		for _, test := range []struct {
+			args    []string
+			want    []transferJSON
+			service serviceJSON
+		}{
+			{nil, all[:2], serviceJSON{Listed: 3, Blocks: 2, Unmatched: 1}},
+			{[]string{"-to", bob.String()}, all[1:2], serviceJSON{Listed: 2, Blocks: 2, Unmatched: 1}},
+			{[]string{"-in"}, in, serviceJSON{Listed: 2, Blocks: 2}},
+		} {
+			args := append([]string{"transfers", "-json", "-all", "-request-file", path}, test.args...)
+			got := decode[allOutput](t, withService.Run(t, args...))
+			if got.FromBlock != 0 || got.ToBlock != safeBlock || !reflect.DeepEqual(got.Transfers, test.want) ||
+				got.Service == nil || *got.Service != test.service {
+				g, _ := json.Marshal(got)
+				t.Errorf("transfers %v: got %s, want blocks 0 to %d, the transfers %+v, and %+v", test.args, g, safeBlock, test.want, test.service)
+			}
+		}
+		// The transfer that the logs don't have is a warning.
+		stderr := withService.Fail(t, 0, "transfers", "-all", "-request-file", path)
+		if want := "lists a transfer of " + ether(1).String() + " from " + safe.String() + " to " + bob.String(); !strings.Contains(string(stderr), want) {
+			t.Errorf("transfers -all: got stderr %q, want a warning containing %q", stderr, want)
+		}
+		text := withService.Run(t, "transfers", "-all", "-request-file", path)
+		for _, want := range []string{
+			fmt.Sprintf(`(?m)^ERC-20 transfers from %s on chain 1, up to block %d, in the 2 blocks with transfers that the Safe Transaction Service lists$`, safe, safeBlock),
+			`(?m)^The service lists 3 such transfers, of which 1 aren't in the logs of their blocks\.$`,
+		} {
+			if !regexp.MustCompile(want).Match(text) {
+				t.Errorf("transfers -all: output has no line matching %q:\n%s", want, text)
+			}
+		}
+		if out := withService.Run(t, "transfers", "-json", "-request-file", path); strings.Contains(string(out), `"service"`) {
+			t.Errorf("transfers without -all: output has a service")
+		}
+		if stderr := arbot.Fail(t, 1, "transfers", "-all", "-request-file", path); !strings.Contains(string(stderr), "-all needs the Safe Transaction Service of chain 1") {
+			t.Errorf("transfers -all without a service: got %q, want an error about the service", stderr)
+		}
+	})
+
+	t.Run("account", func(t *testing.T) {
+		type accountOutput struct {
+			ChainID   uint64          `json:"chainId"`
+			SafeBlock uint64          `json:"safeBlock"`
+			Safe      ethrpc.Address  `json:"safe"`
+			Address   ethrpc.Address  `json:"address"`
+			CodeSize  int             `json:"codeSize"`
+			Self      bool            `json:"self"`
+			Contract  json.RawMessage `json:"contract"`
+			Balance   *big.Int        `json:"balance"`
+			Nonce     uint64          `json:"nonce"`
+			ERC20     *struct {
+				Symbol      string   `json:"symbol"`
+				Decimals    uint8    `json:"decimals"`
+				SafeBalance *big.Int `json:"safeBalance"`
+			} `json:"erc20"`
+		}
+		// The fee token, of which the Safe has what alice sent it before the proposal,
+		// since it sent out all that it wrapped.
+		got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, token.String()))
+		if got.ChainID != ethrpc.Mainnet || got.SafeBlock != safeBlock || got.Safe != safe || got.Address != token ||
+			got.CodeSize == 0 || got.Self || string(got.Contract) != "null" || got.ERC20 == nil ||
+			got.ERC20.Symbol == "" || got.ERC20.Decimals != 18 || got.ERC20.SafeBalance.Cmp(ether(6)) != 0 {
+			t.Errorf("account of the fee token: got %+v %+v, want a contract that is an ERC-20 token with 18 decimals, of which the Safe has %s", got, got.ERC20, ether(6))
+		}
+		// Alice sent two transactions before the proposal, to wrap ether and send it.
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, alice.String())); got.CodeSize != 0 || got.Nonce != 2 || got.ERC20 != nil {
+			t.Errorf("account of alice: got %+v, want no code, nonce 2, and no token", got)
+		}
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, someone.String())); got.CodeSize != 0 || got.Nonce != 0 || got.Balance.Sign() != 0 || got.ERC20 != nil {
+			t.Errorf("account of an unused account: got %+v, want nothing", got)
+		}
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, safe.String())); !got.Self || got.CodeSize == 0 {
+			t.Errorf("account of the Safe: got %+v, want the Safe itself", got)
+		}
+
+		text := arbot.Run(t, "account", "-request-file", path, token.String())
+		for _, want := range []string{
+			fmt.Sprintf(`(?m)^Account %s on chain 1, as of block %d$`, token, safeBlock),
+			`(?m)^  Code +\d+ bytes, hash 0x[0-9a-f]{64}$`,
+			`(?m)^  Decimals +18$`,
+			`(?m)^  Safe balance +` + ether(6).String() + `$`,
+		} {
+			if !regexp.MustCompile(want).Match(text) {
+				t.Errorf("account: output has no line matching %q:\n%s", want, text)
+			}
+		}
+	})
 
 	t.Run("text", func(t *testing.T) {
 		text := arbot.Run(t, "transfers", "-request-file", path)

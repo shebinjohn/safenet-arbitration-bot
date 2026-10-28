@@ -1,10 +1,13 @@
 package txservice
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -124,5 +127,80 @@ func TestDefaultURLs(t *testing.T) {
 		if !strings.HasPrefix(DefaultURLs[chainID], "https://") {
 			t.Errorf("DefaultURLs[%d]: got %q, want an HTTPS URL", chainID, DefaultURLs[chainID])
 		}
+	}
+}
+
+// serveExecutions starts a service that lists n executed transactions of safe,
+// in pages, with the ones in broken having no transaction hash, and returns a
+// client for it.
+func serveExecutions(t *testing.T, safe ethrpc.Address, n int, broken ...int) *Client {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		offset, err := strconv.Atoi(q.Get("offset"))
+		if r.URL.Path != "/tx-service/eth/api/v1/safes/"+safe.String()+"/multisig-transactions/" || err != nil ||
+			q.Get("executed") != "true" || q.Get("ordering") != "nonce" || q.Get("limit") != "100" {
+			http.NotFound(w, r)
+			return
+		}
+		results := []map[string]any{}
+		for i := offset; i < min(n, offset+100); i++ {
+			result := map[string]any{
+				"safe": safe, "to": safe, "value": "0", "data": nil, "operation": 0, "safeTxGas": 0, "baseGas": 0,
+				"gasPrice": "0", "gasToken": ethrpc.Address{}, "refundReceiver": ethrpc.Address{}, "nonce": i,
+				"safeTxHash": ethrpc.Hash{0: 0x5a, 31: byte(i)}, "transactionHash": ethrpc.Hash{0: 0x7a, 31: byte(i)},
+				"blockNumber": 1000 + i, "isExecuted": true,
+			}
+			if slices.Contains(broken, i) {
+				result["transactionHash"] = nil
+			}
+			results = append(results, result)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"count": n, "results": results})
+	}))
+	t.Cleanup(server.Close)
+	return NewClient(server.URL+"/tx-service/eth", ethrpc.Mainnet)
+}
+
+func TestExecutions(t *testing.T) {
+	safe := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000001")
+	// More than a page, so that the client asks for the second one.
+	got, err := serveExecutions(t, safe, 150).Executions(t.Context(), safe)
+	if err != nil {
+		t.Fatalf("Executions: %v", err)
+	}
+	if len(got) != 150 {
+		t.Fatalf("Executions: got %d executions, want 150", len(got))
+	}
+	for i, x := range got {
+		want := Execution{SafeTxHash: ethrpc.Hash{0: 0x5a, 31: byte(i)}, TxHash: ethrpc.Hash{0: 0x7a, 31: byte(i)}, Block: uint64(1000 + i)}
+		if x.SafeTxHash != want.SafeTxHash || x.TxHash != want.TxHash || x.Block != want.Block ||
+			x.Transaction == nil || x.Transaction.Nonce.Int64() != int64(i) || x.Transaction.Safe != safe || x.Transaction.ChainID.Int64() != 1 {
+			t.Errorf("Executions[%d]: got %+v, want %+v with a transaction of nonce %d", i, x, want, i)
+		}
+	}
+
+	// A full last page is followed by an empty one.
+	if got, err := serveExecutions(t, safe, 100).Executions(t.Context(), safe); err != nil || len(got) != 100 {
+		t.Errorf("Executions of a full page: got %d executions and error %v, want 100", len(got), err)
+	}
+	if got, err := serveExecutions(t, safe, 0).Executions(t.Context(), safe); err != nil || len(got) != 0 {
+		t.Errorf("Executions of none: got %d executions and error %v, want none", len(got), err)
+	}
+}
+
+func TestExecutionsErrors(t *testing.T) {
+	safe := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000001")
+	if _, err := serveExecutions(t, safe, 5, 3).Executions(t.Context(), safe); err == nil || !strings.Contains(err.Error(), "no transaction hash") {
+		t.Errorf("Executions with one that has no transaction hash: got error %v, want one about it", err)
+	}
+	// A service for another Safe has no executions of this one.
+	other := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000002")
+	if _, err := serveExecutions(t, other, 5).Executions(t.Context(), safe); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Executions of an unknown Safe: got error %v, want ErrNotFound", err)
+	}
+	_, err := serve(t, http.StatusOK, "").Executions(t.Context(), safe)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("Executions from a service without the endpoint: got error %v, want ErrNotFound", err)
 	}
 }

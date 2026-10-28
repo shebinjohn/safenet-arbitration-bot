@@ -8,7 +8,6 @@ import (
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
-	"github.com/safe-research/safenet-arbitration-bot/internal/solabi"
 	"github.com/safe-research/safenet-arbitration-bot/internal/txservice"
 )
 
@@ -22,6 +21,9 @@ type decoder struct {
 	to         ethrpc.BlockNumber
 	executions []Execution
 	events     map[ethrpc.Hash][]*safenet.SafeTransaction
+	// listed are the transactions that the service lists by Safe transaction hash,
+	// each of which has its hash, so that the service isn't asked for them again.
+	listed map[ethrpc.Hash]*safenet.SafeTransaction
 
 	nonceRead bool
 	// nonceNext is the Safe's nonce after the last execution, or nil if it couldn't
@@ -53,6 +55,9 @@ func (d *decoder) decode(ctx context.Context, i int) (Source, *safenet.SafeTrans
 		}
 	}
 
+	if tx, ok := d.listed[e.SafeTxHash]; ok {
+		return SourceService, tx
+	}
 	if d.Service != nil {
 		tx, err := d.Service.Transaction(ctx, e.SafeTxHash)
 		if err != nil && !errors.Is(err, txservice.ErrNotFound) {
@@ -69,14 +74,11 @@ func (d *decoder) decode(ctx context.Context, i int) (Source, *safenet.SafeTrans
 func (d *decoder) nonce(ctx context.Context, i int) *big.Int {
 	if !d.nonceRead {
 		d.nonceRead = true
-		result, err := d.Eth.Call(ctx, ethrpc.CallRequest{To: d.safe, Data: solabi.Call(nonceSelector)}, d.to)
+		next, err := d.readNonce(ctx, d.safe, d.to)
 		if err != nil {
-			d.warn(fmt.Errorf("reading the nonce of %s at block %d: %w", d.safe, d.to, err))
-		} else if dec := solabi.NewDecoder(result); dec.Err() == nil {
-			if next := dec.Uint(0); dec.Err() == nil {
-				d.nonceNext = next
-			}
+			d.warn(err)
 		}
+		d.nonceNext = next
 	}
 	if d.nonceNext == nil {
 		return nil

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
@@ -34,6 +35,12 @@ type chain struct {
 	// traces are the callTracer results by transaction hash. A transaction without
 	// one fails to trace, like on a node that doesn't serve traces.
 	traces map[ethrpc.Hash]any
+	// deployed is the first block at which the Safe has code.
+	deployed uint64
+
+	mu sync.Mutex
+	// ranges are the block ranges of the eth_getLogs requests, in order.
+	ranges []BlockRange
 }
 
 // serve starts the node, and returns a client for it.
@@ -57,6 +64,9 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 		case "eth_getLogs":
 			var filter ethrpc.LogFilter
 			json.Unmarshal(req.Params[0], &filter)
+			c.mu.Lock()
+			c.ranges = append(c.ranges, BlockRange{uint64(filter.FromBlock), uint64(filter.ToBlock)})
+			c.mu.Unlock()
 			logs := []ethrpc.Log{}
 			for _, log := range c.logs {
 				if log.BlockNumber >= filter.FromBlock && log.BlockNumber <= filter.ToBlock &&
@@ -76,6 +86,16 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 			}
 			word := solabi.Uint(c.nonce)
 			res["result"] = ethrpc.Bytes(word[:])
+		case "eth_getCode":
+			var address ethrpc.Address
+			var block ethrpc.BlockNumber
+			json.Unmarshal(req.Params[0], &address)
+			json.Unmarshal(req.Params[1], &block)
+			if address == safe && c.deployed > 0 && uint64(block) >= c.deployed {
+				res["result"] = "0x5afe"
+			} else {
+				res["result"] = "0x"
+			}
 		case "eth_getTransactionByHash":
 			var hash ethrpc.Hash
 			json.Unmarshal(req.Params[0], &hash)

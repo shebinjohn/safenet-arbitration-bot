@@ -26,6 +26,8 @@ func TestExecutionsErrors(t *testing.T) {
 	}{
 		{nil, 2, "-request-file is required"},
 		{[]string{"-request-file", request, "-blocks", "0"}, 2, "-blocks must be at least 1"},
+		{[]string{"-request-file", request, "-all", "-blocks", "5"}, 2, "-blocks doesn't apply with -all"},
+		{[]string{"-request-file", request, "-all"}, 1, "no Safe chain ID or block"},
 		{[]string{"-request-file", request, "extra"}, 2, "Usage: arbot executions"},
 		{[]string{"-request-file", request}, 1, "no Safe chain ID or block"},
 		{[]string{"-request-file", filepath.Join(dir, "missing.json")}, 1, "no such file"},

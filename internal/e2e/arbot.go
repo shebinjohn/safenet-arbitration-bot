@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/cli"
@@ -42,6 +43,29 @@ func newArbot(tb testing.TB, gateway string, nodes ...*Anvil) *Arbot {
 	}
 	data, err := json.Marshal(config)
 	if err != nil {
+		tb.Fatal(err)
+	}
+	path := filepath.Join(tb.TempDir(), "config.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		tb.Fatal(err)
+	}
+	return &Arbot{config: path}
+}
+
+// WithTxService returns an Arbot configured like a, but with the Safe
+// Transaction Service at the base URL url for the chain with the ID chainID.
+func (a *Arbot) WithTxService(tb testing.TB, chainID uint64, url string) *Arbot {
+	tb.Helper()
+	data, err := os.ReadFile(a.config)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		tb.Fatal(err)
+	}
+	config["txServices"].(map[string]any)[strconv.FormatUint(chainID, 10)] = url
+	if data, err = json.Marshal(config); err != nil {
 		tb.Fatal(err)
 	}
 	path := filepath.Join(tb.TempDir(), "config.json")

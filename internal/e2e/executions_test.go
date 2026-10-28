@@ -2,7 +2,10 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/e2e"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/executions"
 	"github.com/safe-research/safenet-arbitration-bot/internal/functions"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
 	"github.com/safe-research/safenet-arbitration-bot/internal/solabi"
@@ -116,7 +120,7 @@ func TestExecutions(t *testing.T) {
 
 	// An execution after the proposal, which the evidence must not include.
 	mainnet.MineUntil(n.Header(r.Block).Time())
-	exec(safe, zero(safenet.SafeTransaction{To: target, Data: []byte("later")}), ethrpc.Address{}, "calldata", true)
+	later := exec(safe, zero(safenet.SafeTransaction{To: target, Data: []byte("later")}), ethrpc.Address{}, "calldata", true)
 
 	arbot := n.Arbot()
 	dir := t.TempDir()
@@ -235,6 +239,79 @@ func TestExecutions(t *testing.T) {
 		line := `(?m)^3 +1 +root +` + target.String() + ` +no code +CALL +0 +execTransaction > transfer$`
 		if !regexp.MustCompile(line).Match(text) {
 			t.Errorf("executions -calls: output has no line matching %q:\n%s", line, text)
+		}
+	})
+
+	t.Run("all", func(t *testing.T) {
+		// A service that lists the Safe's executions but the one through the forwarder,
+		// and the one after the proposal.
+		listed := []executionJSON{viaCalldata, failed, nested, later}
+		service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/api/v1/safes/"+safe.String()+"/multisig-transactions/" {
+				http.NotFound(w, r)
+				return
+			}
+			results := []map[string]any{}
+			for _, x := range listed {
+				tx := x.Transaction
+				results = append(results, map[string]any{
+					"safe": tx.Safe, "to": tx.To, "value": tx.Value.String(), "data": tx.Data, "operation": uint8(tx.Operation),
+					"safeTxGas": tx.SafeTxGas.String(), "baseGas": tx.BaseGas.String(), "gasPrice": tx.GasPrice.String(),
+					"gasToken": tx.GasToken, "refundReceiver": tx.RefundReceiver, "nonce": tx.Nonce.Uint64(),
+					"safeTxHash": x.SafeTxHash, "transactionHash": x.TxHash, "blockNumber": x.Block,
+				})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"count": len(results), "results": results})
+		}))
+		t.Cleanup(service.Close)
+		withService := arbot.WithTxService(t, ethrpc.Mainnet, service.URL)
+
+		type historyOutput struct {
+			executionsOutput
+			History *struct {
+				Nonce    uint64                  `json:"nonce"`
+				Complete bool                    `json:"complete"`
+				Scanned  []executions.BlockRange `json:"scanned"`
+			} `json:"history"`
+		}
+		got := decode[historyOutput](t, withService.Run(t, "executions", "-json", "-all", "-request-file", path))
+		if got.Safe != safe || got.FromBlock != 0 || got.ToBlock != safeBlock {
+			t.Errorf("executions -all: got Safe %s in blocks %d to %d, want %s in blocks 0 to %d", got.Safe, got.FromBlock, got.ToBlock, safe, safeBlock)
+		}
+		// The one that the service doesn't list is between those before and after it.
+		want := []executionJSON{viaCalldata, viaTrace, failed, nested}
+		if !reflect.DeepEqual(canonical(t, got.Executions), canonical(t, want)) {
+			g, _ := json.MarshalIndent(got.Executions, "", "  ")
+			w, _ := json.MarshalIndent(want, "", "  ")
+			t.Errorf("executions -all:\ngot  %s\nwant %s", g, w)
+		}
+		scanned := []executions.BlockRange{{FromBlock: viaCalldata.Block, ToBlock: failed.Block}}
+		if h := got.History; h == nil || h.Nonce != 4 || !h.Complete || !reflect.DeepEqual(h.Scanned, scanned) {
+			t.Errorf("executions -all: got history %+v, want nonce 4, complete, with blocks %v scanned", h, scanned)
+		}
+		// Without -all, there is no history.
+		if out := withService.Run(t, "executions", "-json", "-request-file", path); strings.Contains(string(out), `"history"`) {
+			t.Errorf("executions without -all: output has a history")
+		}
+
+		text := withService.Run(t, "executions", "-all", "-request-file", path)
+		for _, want := range []string{
+			`(?m)^Safe transactions executed by ` + safe.String() + ` on chain 1, up to block \d+$`,
+			`(?m)^Found 4 executions, and the Safe's nonce at block \d+ is 4: complete\.$`,
+			fmt.Sprintf(`(?m)^Scanned blocks %d to %d for executions that the service doesn't list\.$`, viaCalldata.Block, failed.Block),
+			`(?m)^\d+ +` + viaTrace.TxHash.String() + ` +success +` + viaTrace.SafeTxHash.String() + ` +trace +1 +`,
+		} {
+			if !regexp.MustCompile(want).Match(text) {
+				t.Errorf("executions -all: output has no line matching %q:\n%s", want, text)
+			}
+		}
+
+		// Without a service, -all fails, and it searches every block.
+		if stderr := arbot.Fail(t, 1, "executions", "-all", "-request-file", path); !strings.Contains(string(stderr), "-all needs the Safe Transaction Service of chain 1") {
+			t.Errorf("executions -all without a service: got %q, want an error about the service", stderr)
+		}
+		if stderr := withService.Fail(t, 2, "executions", "-all", "-blocks", "10", "-request-file", path); !strings.Contains(string(stderr), "-blocks doesn't apply with -all") {
+			t.Errorf("executions -all -blocks: got %q, want a usage error", stderr)
 		}
 	})
 

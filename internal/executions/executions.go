@@ -94,41 +94,82 @@ type Finder struct {
 // Find returns the Safe transactions that the Safe executed in the blocks from
 // to to, including both, in order.
 func (f *Finder) Find(ctx context.Context, safe ethrpc.Address, from, to ethrpc.BlockNumber) ([]Execution, error) {
-	logs := f.Eth.ScanLogs(ctx, ethrpc.LogFilter{
+	c := newCollector(f, safe)
+	if err := c.scan(ctx, from, to); err != nil {
+		return nil, err
+	}
+	d := &decoder{Finder: f, safe: safe, to: to, executions: c.executions, events: c.events}
+	for i := range c.executions {
+		e := &c.executions[i]
+		e.Source, e.Transaction = d.decode(ctx, i)
+	}
+	return c.executions, nil
+}
+
+// collector collects the executions of a Safe, and its SafeMultiSigTransaction
+// events, from its logs.
+type collector struct {
+	*Finder
+	safe       ethrpc.Address
+	executions []Execution
+	// events are the SafeMultiSigTransaction logs by onchain transaction, whose
+	// hash matches the transaction of the execution that follows.
+	events map[ethrpc.Hash][]*safenet.SafeTransaction
+	// seen are the logs collected, by block and log index, so that a block that is
+	// scanned again adds nothing.
+	seen map[[2]uint64]bool
+}
+
+func newCollector(f *Finder, safe ethrpc.Address) *collector {
+	return &collector{
+		Finder: f, safe: safe, executions: []Execution{},
+		events: make(map[ethrpc.Hash][]*safenet.SafeTransaction), seen: make(map[[2]uint64]bool),
+	}
+}
+
+// scan collects the executions and events of the Safe in the blocks from to to,
+// including both.
+func (c *collector) scan(ctx context.Context, from, to ethrpc.BlockNumber) error {
+	logs := c.Eth.ScanLogs(ctx, ethrpc.LogFilter{
 		FromBlock: from,
 		ToBlock:   to,
-		Addresses: []ethrpc.Address{safe},
+		Addresses: []ethrpc.Address{c.safe},
 		Topics:    [][]ethrpc.Hash{{executionSuccessEvent, executionFailureEvent, multiSigEvent}},
 	})
-
-	executions := []Execution{}
-	// The SafeMultiSigTransaction logs by onchain transaction, whose hash matches
-	// the transaction of the execution that follows.
-	events := make(map[ethrpc.Hash][]*safenet.SafeTransaction)
 	for log, err := range logs {
 		if err != nil {
-			return nil, fmt.Errorf("listing Safe transactions of %s: %w", safe, err)
+			return fmt.Errorf("listing Safe transactions of %s: %w", c.safe, err)
 		}
-		if log.Removed || len(log.Topics) == 0 {
+		key := [2]uint64{uint64(log.BlockNumber), uint64(log.LogIndex)}
+		if log.Removed || len(log.Topics) == 0 || c.seen[key] {
 			continue
 		}
+		c.seen[key] = true
 		if log.Topics[0] == multiSigEvent {
-			if tx := f.decodeEvent(safe, log.Data); tx != nil {
-				events[log.TransactionHash] = append(events[log.TransactionHash], tx)
+			if tx := c.decodeEvent(c.safe, log.Data); tx != nil {
+				c.events[log.TransactionHash] = append(c.events[log.TransactionHash], tx)
 			}
 			continue
 		}
 		if e, ok := decodeExecution(log); ok {
-			executions = append(executions, e)
+			c.executions = append(c.executions, e)
 		}
 	}
+	return nil
+}
 
-	d := &decoder{Finder: f, safe: safe, to: to, executions: executions, events: events}
-	for i := range executions {
-		e := &executions[i]
-		e.Source, e.Transaction = d.decode(ctx, i)
+// readNonce returns the nonce of the Safe at block.
+func (f *Finder) readNonce(ctx context.Context, safe ethrpc.Address, block ethrpc.BlockNumber) (*big.Int, error) {
+	result, err := f.Eth.Call(ctx, ethrpc.CallRequest{To: safe, Data: solabi.Call(nonceSelector)}, block)
+	if err != nil {
+		return nil, fmt.Errorf("reading the nonce of %s at block %d: %w", safe, block, err)
 	}
-	return executions, nil
+	d := solabi.NewDecoder(result)
+	nonce := d.Uint(0)
+	if err := d.Err(); err != nil {
+		return nil, fmt.Errorf("reading the nonce of %s at block %d: %w", safe, block, err)
+	}
+	return nonce, nil
 }
 
 // decodeExecution decodes an ExecutionSuccess or ExecutionFailure log. Safe

@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"math/big"
 	"text/tabwriter"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/checks"
@@ -16,10 +18,26 @@ type executionsReport struct {
 	Safe    ethrpc.Address `json:"safe"`
 	ChainID uint64         `json:"chainId"`
 	// FromBlock and ToBlock are the blocks searched, both included. ToBlock is the
-	// request's Safe block.
+	// request's Safe block. FromBlock is 0 with -all.
 	FromBlock  uint64      `json:"fromBlock"`
 	ToBlock    uint64      `json:"toBlock"`
 	Executions []execution `json:"executions"`
+	// History is how the executions were found with -all, and is left out without
+	// it.
+	History *historyReport `json:"history,omitempty"`
+}
+
+// historyReport is how `arbot executions -all` found the executions.
+type historyReport struct {
+	// Nonce is the Safe's nonce at the Safe block, which is the number of Safe
+	// transactions that it executed up to it, since each execution uses the next
+	// nonce, unless a delegate call changed its nonce.
+	Nonce *big.Int `json:"nonce"`
+	// Complete is whether the number of executions is the nonce.
+	Complete bool `json:"complete"`
+	// Scanned are the ranges of blocks whose logs were scanned for the executions
+	// that the Safe Transaction Service doesn't list.
+	Scanned []executions.BlockRange `json:"scanned"`
 }
 
 // execution is an execution in the output of `arbot executions`.
@@ -40,6 +58,7 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	requestFile := flags.String("request-file", "", "read the Safe, its chain, and the block from the request in the JSON file at `path`, as written by arbot info -json")
 	blocks := flags.Uint64("blocks", defaultScanBlocks, "search this number of blocks up to the request's Safe block")
 	withCalls := flags.Bool("calls", false, "also list the calls that each transaction makes, as arbot calls lists them")
+	all := flags.Bool("all", false, "list every execution up to the request's Safe block, found with the Safe Transaction Service, instead of searching the last -blocks blocks")
 	flags.Usage = func() {
 		out := flags.Output()
 		fmt.Fprintf(out, "Usage: %s executions [flags] -request-file <path>\n\n", e.progname)
@@ -64,38 +83,78 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 		fmt.Fprintf(out, "function, if it is one, such as an ERC-20 transfer, or a Safe's execTransaction and the call it makes.\n")
 		fmt.Fprintf(out, "The refund call is the largest refund that a transaction allows, and the payment is what it paid. The\n")
 		fmt.Fprintf(out, "calls of a failed execution had no effect.\n\n")
+		fmt.Fprintf(out, "With -all, it lists every execution up to the request's Safe block instead, which a scan of the\n")
+		fmt.Fprintf(out, "Safe's logs can't reach on public nodes. It lists the Safe's executed transactions from the Safe\n")
+		fmt.Fprintf(out, "Transaction Service, which it needs, and only uses them to find the blocks to read: it reads the logs\n")
+		fmt.Fprintf(out, "of each block that the service names, and keeps the executions that the Safe logged there, up to the\n")
+		fmt.Fprintf(out, "Safe block, which it decodes as above. Each execution uses the next nonce, so the Safe's nonce at the\n")
+		fmt.Fprintf(out, "Safe block is the number of executions up to it, unless a delegate call changed it. For the nonces\n")
+		fmt.Fprintf(out, "that no execution found has, it scans the blocks between the executions before and after them, from\n")
+		fmt.Fprintf(out, "the Safe's deployment, which it finds from the code of old blocks, or up to the Safe block, and\n")
+		fmt.Fprintf(out, "reports the ranges. It says whether the history is complete: whether it found as many executions as\n")
+		fmt.Fprintf(out, "the nonce, and warns if not.\n\n")
 		flags.PrintDefaults()
 	}
 	if err := parse(flags, args, 0); err != nil {
 		return err
 	}
-	scan, err := openScan(ctx, e, *requestFile, *blocks)
-	if err != nil {
-		return err
+	blocksSet := false
+	flags.Visit(func(f *flag.Flag) { blocksSet = blocksSet || f.Name == "blocks" })
+	if *all && blocksSet {
+		return usageError("-blocks doesn't apply with -all, which searches every block")
+	}
+	var ref *safeRef
+	var fromBlock uint64
+	if *all {
+		safe, err := openSafe(ctx, e, *requestFile)
+		if err != nil {
+			return err
+		}
+		ref = safe
+	} else {
+		scan, err := openScan(ctx, e, *requestFile, *blocks)
+		if err != nil {
+			return err
+		}
+		ref, fromBlock = scan.safeRef, scan.FromBlock
 	}
 
 	finder := &executions.Finder{
-		Eth:  scan.eth,
+		Eth:  ref.eth,
 		Warn: func(err error) { fmt.Fprintf(e.stderr, "%s: warning: %v\n", e.progname, err) },
 	}
-	baseURL, ok := e.cfg.TxServices[scan.ChainID]
+	baseURL, ok := e.cfg.TxServices[ref.ChainID]
 	if !ok {
-		baseURL = txservice.DefaultURLs[scan.ChainID]
+		baseURL = txservice.DefaultURLs[ref.ChainID]
 	}
 	if baseURL != "" {
-		finder.Service = txservice.NewClient(baseURL, scan.ChainID)
+		finder.Service = txservice.NewClient(baseURL, ref.ChainID)
 	}
-	found, err := finder.Find(ctx, scan.Safe, ethrpc.BlockNumber(scan.FromBlock), ethrpc.BlockNumber(scan.ToBlock))
-	if err != nil {
-		return err
+	report := executionsReport{Safe: ref.Safe, ChainID: ref.ChainID, FromBlock: fromBlock, ToBlock: ref.SafeBlock}
+	var found []executions.Execution
+	if *all {
+		if finder.Service == nil {
+			return fmt.Errorf("-all needs the Safe Transaction Service of chain %d, which the txServices setting leaves out", ref.ChainID)
+		}
+		history, err := finder.FindAll(ctx, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock))
+		if err != nil {
+			return err
+		}
+		found = history.Executions
+		report.History = &historyReport{Nonce: history.Nonce, Complete: history.Complete(), Scanned: history.Scanned}
+		if !history.Complete() {
+			finder.Warn(fmt.Errorf("found %d executions up to block %d, but the Safe's nonce there is %s", len(found), ref.SafeBlock, history.Nonce))
+		}
+	} else {
+		var err error
+		if found, err = finder.Find(ctx, ref.Safe, ethrpc.BlockNumber(fromBlock), ethrpc.BlockNumber(ref.SafeBlock)); err != nil {
+			return err
+		}
 	}
-	report := executionsReport{
-		Safe: scan.Safe, ChainID: scan.ChainID, FromBlock: scan.FromBlock, ToBlock: scan.ToBlock,
-		Executions: make([]execution, len(found)),
-	}
+	report.Executions = make([]execution, len(found))
 	var reader *checks.CallReader
 	if *withCalls {
-		reader = checks.NewCallReader(scan.eth, scan.Safe, ethrpc.BlockNumber(scan.SafeBlock))
+		reader = checks.NewCallReader(ref.eth, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock))
 	}
 	for i, x := range found {
 		report.Executions[i].Execution = x
@@ -112,9 +171,23 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	if *asJSON {
 		return writeJSON(e.stdout, report)
 	}
-	fmt.Fprintf(e.stdout, "Safe transactions executed by %s on chain %d, in blocks %d to %d\n\n", report.Safe, report.ChainID, report.FromBlock, report.ToBlock)
+	if h := report.History; h != nil {
+		fmt.Fprintf(e.stdout, "Safe transactions executed by %s on chain %d, up to block %d\n\n", report.Safe, report.ChainID, report.ToBlock)
+		completeness := "complete"
+		if !h.Complete {
+			completeness = "incomplete"
+		}
+		fmt.Fprintf(e.stdout, "Found %d executions, and the Safe's nonce at block %d is %s: %s.\n", len(found), report.ToBlock, h.Nonce, completeness)
+		fmt.Fprintf(e.stdout, "Listed by the Safe Transaction Service, and read from the Safe's logs in the blocks that it names.\n")
+		for _, r := range h.Scanned {
+			fmt.Fprintf(e.stdout, "Scanned blocks %d to %d for executions that the service doesn't list.\n", r.FromBlock, r.ToBlock)
+		}
+		fmt.Fprintln(e.stdout)
+	} else {
+		fmt.Fprintf(e.stdout, "Safe transactions executed by %s on chain %d, in blocks %d to %d\n\n", report.Safe, report.ChainID, report.FromBlock, report.ToBlock)
+	}
 	if len(found) == 0 {
-		_, err = fmt.Fprintln(e.stdout, "none")
+		_, err := fmt.Fprintln(e.stdout, "none")
 		return err
 	}
 	w := tabwriter.NewWriter(e.stdout, 0, 0, 2, ' ', 0)

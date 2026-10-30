@@ -73,10 +73,12 @@ func callNode(t *testing.T, contracts map[ethrpc.Address]contract) *ethrpc.Clien
 func TestRead(t *testing.T) {
 	balance, _ := new(big.Int).SetString("26199343952008652136834", 10)
 	token := contract{results: map[[4]byte][]byte{
-		decimalsSelector:  solabi.Encode(uint64(18)),
-		balanceOfSelector: solabi.Encode(balance),
-		nameSelector:      solabi.Encode("Token \x1b[31mA"),
-		symbolSelector:    solabi.Encode("TKA"),
+		decimalsSelector:    solabi.Encode(uint64(18)),
+		balanceOfSelector:   solabi.Encode(balance),
+		nameSelector:        solabi.Encode("Token \x1b[31mA"),
+		symbolSelector:      solabi.Encode("TKA"),
+		totalSupplySelector: solabi.Encode(uint64(1e9)),
+		allowanceSelector:   solabi.Encode(uint64(7)),
 	}}
 	// A token without a name, and whose symbol is a bytes32, as some old tokens
 	// have.
@@ -93,15 +95,38 @@ func TestRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	if got == nil || got.Name != "Token \x1b[31mA" || got.Symbol != "TKA" || got.Decimals != 18 || got.Balance.Cmp(balance) != 0 {
-		t.Errorf("Read: got %+v, want the token's name, symbol, 18 decimals, and balance %s", got, balance)
+	if got == nil || got.Name != "Token \x1b[31mA" || got.Symbol != "TKA" || got.Decimals != 18 || got.Balance.Cmp(balance) != 0 ||
+		got.TotalSupply == nil || got.TotalSupply.Int64() != 1e9 {
+		t.Errorf("Read: got %+v, want the token's name, symbol, 18 decimals, total supply 1e9, and balance %s", got, balance)
 	}
 	got, err = Read(t.Context(), eth, tokenB, safe, 100)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	if got == nil || got.Name != "" || got.Symbol != "" || got.Decimals != 6 || got.Balance.Sign() != 0 {
-		t.Errorf("Read of a token without strings: got %+v, want no name or symbol, 6 decimals, and no balance", got)
+	if got == nil || got.Name != "" || got.Symbol != "" || got.Decimals != 6 || got.Balance.Sign() != 0 || got.TotalSupply != nil {
+		t.Errorf("Read of a token without strings: got %+v, want no name, symbol, or total supply, 6 decimals, and no balance", got)
+	}
+}
+
+func TestAllowance(t *testing.T) {
+	eth := callNode(t, map[ethrpc.Address]contract{
+		tokenA: {results: map[[4]byte][]byte{allowanceSelector: solabi.Encode(uint64(7))}},
+		// A contract whose allowance reverts.
+		tokenB: {results: map[[4]byte][]byte{}},
+		alice:  {failing: true},
+	})
+	if got, err := Allowance(t.Context(), eth, tokenA, safe, bob, 100); err != nil || got == nil || got.Int64() != 7 {
+		t.Errorf("Allowance: got %v and error %v, want 7", got, err)
+	}
+	// An account that doesn't answer has no allowance, and one without code returns
+	// nothing.
+	for _, account := range []ethrpc.Address{tokenB, bob} {
+		if got, err := Allowance(t.Context(), eth, account, safe, bob, 100); got != nil || err != nil {
+			t.Errorf("Allowance(%s): got %v and error %v, want nil", account, got, err)
+		}
+	}
+	if _, err := Allowance(t.Context(), eth, alice, safe, bob, 100); err == nil {
+		t.Error("Allowance with a failing node: expected an error")
 	}
 }
 

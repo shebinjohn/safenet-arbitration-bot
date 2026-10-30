@@ -29,6 +29,7 @@ func TestAccountErrors(t *testing.T) {
 		{[]string{"-request-file", request}, 2, "Usage: arbot account"},
 		{[]string{"-request-file", request, address, "extra"}, 2, "Usage: arbot account"},
 		{[]string{"-request-file", request, "0x12"}, 2, `address "0x12"`},
+		{[]string{"-request-file", request, "-spender", "0x12", address}, 2, `-spender "0x12"`},
 		{[]string{"-request-file", request, address}, 1, "no Safe chain ID or block"},
 	}
 	for _, test := range tests {

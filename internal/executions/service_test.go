@@ -23,10 +23,15 @@ type listed struct {
 }
 
 // listingService starts a Safe Transaction Service that lists the executions of
-// the Safe, and returns a client for it.
-func listingService(t *testing.T, executions []listed) *txservice.Client {
+// the Safe, and returns a client for it. It says that the transaction with the
+// hash creation created the Safe, if given.
+func listingService(t *testing.T, executions []listed, creation ...ethrpc.Hash) *txservice.Client {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/safes/"+safe.String()+"/creation/" && len(creation) > 0 {
+			json.NewEncoder(w).Encode(map[string]any{"transactionHash": creation[0], "creator": relayer})
+			return
+		}
 		if r.URL.Path != "/api/v1/safes/"+safe.String()+"/multisig-transactions/" {
 			http.NotFound(w, r)
 			return
@@ -160,5 +165,53 @@ func TestMissing(t *testing.T) {
 	}
 	if got := missing(nil, 0); len(got) != 0 {
 		t.Errorf("missing with nonce 0: got %v, want none", got)
+	}
+}
+
+func TestCreationFromService(t *testing.T) {
+	const last = 200
+	factory := ethrpc.Address{0: 0xfa, 19: 1}
+	// A ProxyCreation log of the factory, with the proxy as a topic like 1.4.1, and
+	// one of another contract for another proxy before it.
+	proxyCreation := func(emitter, proxy ethrpc.Address) ethrpc.Log {
+		var topic ethrpc.Hash
+		copy(topic[12:], proxy[:])
+		return ethrpc.Log{Address: emitter, Topics: []ethrpc.Hash{proxyCreationEvent, topic}, Data: make([]byte, 32)}
+	}
+	created := ethrpc.Receipt{TransactionHash: hash(1), BlockNumber: 100, Status: 1, Logs: []ethrpc.Log{
+		proxyCreation(relayer, target), proxyCreation(factory, safe),
+	}}
+	tests := []struct {
+		name     string
+		created  uint64
+		creation []ethrpc.Hash
+		receipts map[ethrpc.Hash]ethrpc.Receipt
+		want     *Creation
+		warning  string
+	}{
+		{"confirmed", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, &Creation{100, hash(1), &factory}, ""},
+		{"without a log", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): {BlockNumber: 100}}, &Creation{100, hash(1), nil}, ""},
+		{"code before", 90, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, nil, "has code at block 99"},
+		{"no code", 0, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, nil, "no code at block 100"},
+		{"later", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): {BlockNumber: last + 1}}, nil, ""},
+		{"no receipt", 100, []ethrpc.Hash{hash(1)}, nil, nil, "receipt"},
+		{"unknown", 100, nil, nil, nil, "not found"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := &chain{created: test.created, receipts: test.receipts}
+			f := &Finder{Eth: c.serve(t), Service: listingService(t, nil, test.creation...)}
+			var warnings []error
+			f.Warn = func(err error) { warnings = append(warnings, err) }
+			if got := f.CreationFromService(t.Context(), safe, last); !reflect.DeepEqual(got, test.want) {
+				t.Errorf("CreationFromService: got %+v, want %+v", got, test.want)
+			}
+			switch {
+			case test.warning == "" && len(warnings) != 0:
+				t.Errorf("warnings: got %v, want none", warnings)
+			case test.warning != "" && (len(warnings) != 1 || !strings.Contains(warnings[0].Error(), test.warning)):
+				t.Errorf("warnings: got %v, want one containing %q", warnings, test.warning)
+			}
+		})
 	}
 }

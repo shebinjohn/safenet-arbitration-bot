@@ -28,7 +28,10 @@ type historyReport struct {
 	Missing []executions.NonceRange `json:"missingNonces"`
 	// ProposalExecution is the execution of the request's own Safe transaction, if
 	// it was executed by the Safe block. It isn't in Executions, since the
-	// transaction's own effects aren't evidence (§ 3.6).
+	// transaction's own effects aren't evidence (§ 3.6). Creation is the creation
+	// of the Safe's account, if the service has it and the chain confirms it, or
+	// null.
+	Creation          *executions.Creation  `json:"creation"`
 	ProposalExecution *execution            `json:"proposalExecution"`
 	Executions        []execution           `json:"executions"`
 	Rejected          []executions.Rejected `json:"rejected"`
@@ -63,6 +66,10 @@ func historyCommand(ctx context.Context, e *env, args []string) error {
 		fmt.Fprintf(out, "the nonces below it that no listed execution used: the executions that the service doesn't have, or\n")
 		fmt.Fprintf(out, "has wrongly. None missing means the history of the Safe's own executions is complete. Executions by\n")
 		fmt.Fprintf(out, "modules don't use nonces, and the service doesn't list them.\n\n")
+		fmt.Fprintf(out, "It also reports the block and transaction that created the Safe's account, if the service has\n")
+		fmt.Fprintf(out, "them and the chain confirms them: the account has no code at the block before, and has code at\n")
+		fmt.Fprintf(out, "the block, which needs a node that serves the code at old blocks. The factory is the contract that\n")
+		fmt.Fprintf(out, "logged the ProxyCreation event of the account in the transaction, if any.\n\n")
 		fmt.Fprintf(out, "The execution of the request's own Safe transaction, if it was executed by the Safe block, is reported\n")
 		fmt.Fprintf(out, "apart from the others, since its effects aren't evidence (§ 3.6).\n\n")
 		fmt.Fprintf(out, "With -calls, it also lists the calls that each transaction makes, as arbot executions -calls does.\n\n")
@@ -101,6 +108,7 @@ func historyCommand(ctx context.Context, e *env, args []string) error {
 		Safe: ref.Safe, ChainID: ref.ChainID, SafeBlock: ref.SafeBlock,
 		Service: serviceSource{URL: baseURL, ObservedAt: observed},
 		Nonce:   history.Nonce, Missing: history.Missing,
+		Creation:   finder.CreationFromService(ctx, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock)),
 		Executions: []execution{}, Rejected: history.Rejected,
 	}
 	var reader *checks.CallReader
@@ -133,6 +141,15 @@ func historyCommand(ctx context.Context, e *env, args []string) error {
 	} else {
 		fmt.Fprintf(e.stdout, "Nonce at block %d: %s\n", report.SafeBlock, report.Nonce)
 		fmt.Fprintf(e.stdout, "Missing nonces: %s\n", nonceRanges(report.Missing))
+	}
+	if c := report.Creation; c != nil {
+		factory := "no ProxyCreation event"
+		if c.Factory != nil {
+			factory = "ProxyCreation event of " + c.Factory.String()
+		}
+		fmt.Fprintf(e.stdout, "Created in block %d, transaction %s (%s)\n", c.Block, c.TxHash, factory)
+	} else {
+		fmt.Fprintf(e.stdout, "Creation: unknown\n")
 	}
 	if x := report.ProposalExecution; x != nil {
 		fmt.Fprintf(e.stdout, "The request's own Safe transaction was executed in block %d, transaction %s (not listed below)\n", x.Block, x.TxHash)

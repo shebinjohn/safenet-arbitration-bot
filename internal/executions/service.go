@@ -164,3 +164,76 @@ func missing(executions []Execution, next uint64) []NonceRange {
 	}
 	return ranges
 }
+
+// proxyCreationEvent is the ProxyCreation event of the Safe proxy factories,
+// which index the proxy from 1.4.1 and have it in the data in 1.3.0.
+var proxyCreationEvent = solabi.Event("ProxyCreation(address,address)")
+
+// Creation is the creation of a Safe's account.
+type Creation struct {
+	// Block is the block whose transaction gave the account its code: it has no
+	// code at the block before, and has code at Block.
+	Block  uint64      `json:"block"`
+	TxHash ethrpc.Hash `json:"txHash"`
+	// Factory is the contract that logged the ProxyCreation event of the account in
+	// the transaction, or nil if none did.
+	Factory *ethrpc.Address `json:"factory"`
+}
+
+// CreationFromService returns the creation of the Safe's account by block to,
+// if the Finder's Service has the transaction that created it and the chain
+// confirms it: the transaction's receipt is in a block up to to, the account
+// has no code at the block before it, and has code at its block. It returns
+// nil, with a warning, if the service doesn't have it or the chain doesn't
+// confirm it, such as for a node that doesn't serve the code at old blocks.
+func (f *Finder) CreationFromService(ctx context.Context, safe ethrpc.Address, to ethrpc.BlockNumber) *Creation {
+	if f.Service == nil {
+		return nil
+	}
+	hash, err := f.Service.Creation(ctx, safe)
+	if err != nil {
+		f.warn(fmt.Errorf("getting the creation of %s from the Safe Transaction Service: %w", safe, err))
+		return nil
+	}
+	receipt, err := f.Eth.GetTransactionReceipt(ctx, hash)
+	if err != nil {
+		f.warn(fmt.Errorf("getting the receipt of the creation %s: %w", hash, err))
+		return nil
+	}
+	block := receipt.BlockNumber
+	if block > to || block == 0 {
+		return nil
+	}
+	before, err := f.Eth.GetCode(ctx, safe, block-1)
+	if err == nil && len(before) == 0 {
+		var after ethrpc.Bytes
+		if after, err = f.Eth.GetCode(ctx, safe, block); err == nil && len(after) == 0 {
+			err = fmt.Errorf("the account has no code at block %d", block)
+		}
+	} else if err == nil {
+		err = fmt.Errorf("the account has code at block %d, before it", block-1)
+	}
+	if err != nil {
+		f.warn(fmt.Errorf("confirming the creation %s of %s: %w", hash, safe, err))
+		return nil
+	}
+	c := &Creation{Block: uint64(block), TxHash: hash}
+	for _, log := range receipt.Logs {
+		if log.Removed || len(log.Topics) == 0 || log.Topics[0] != proxyCreationEvent {
+			continue
+		}
+		var proxy ethrpc.Address
+		switch {
+		case len(log.Topics) == 2:
+			proxy = ethrpc.Address(log.Topics[1][12:])
+		case len(log.Topics) == 1 && len(log.Data) == 64:
+			proxy = ethrpc.Address(log.Data[12:32])
+		}
+		if proxy == safe {
+			factory := log.Address
+			c.Factory = &factory
+			break
+		}
+	}
+	return c
+}

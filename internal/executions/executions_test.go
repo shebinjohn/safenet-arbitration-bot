@@ -36,6 +36,8 @@ type chain struct {
 	traces map[ethrpc.Hash]any
 	// receipts are the receipts by transaction hash.
 	receipts map[ethrpc.Hash]ethrpc.Receipt
+	// created is the block from which the Safe has code, or 0 if it has none.
+	created uint64
 }
 
 // serve starts the node, and returns a client for it.
@@ -85,6 +87,14 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 				res["result"] = tx
 			} else {
 				res["result"] = nil
+			}
+		case "eth_getCode":
+			var block ethrpc.BlockNumber
+			json.Unmarshal(req.Params[1], &block)
+			if c.created != 0 && uint64(block) >= c.created {
+				res["result"] = "0x6001"
+			} else {
+				res["result"] = "0x"
 			}
 		case "eth_getTransactionReceipt":
 			var hash ethrpc.Hash

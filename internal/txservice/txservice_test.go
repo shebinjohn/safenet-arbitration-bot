@@ -182,3 +182,28 @@ func TestExecuted(t *testing.T) {
 		t.Errorf("Executed of an unknown Safe: got %v, %v, want no executions", got, err)
 	}
 }
+
+func TestCreation(t *testing.T) {
+	safe := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000001")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/safes/" + safe.String() + "/creation/":
+			w.Write([]byte(`{"created": "2026-07-05T21:24:23Z", "transactionHash": "` + hash.String() + `", "factoryAddress": "0x0000000000000000000000000000000000000001"}`))
+		case "/api/v1/safes/" + (ethrpc.Address{19: 2}).String() + "/creation/":
+			w.Write([]byte(`{"transactionHash": null}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client := NewClient(server.URL, ethrpc.Mainnet)
+
+	if got, err := client.Creation(t.Context(), safe); err != nil || got != hash {
+		t.Errorf("Creation: got %s, %v, want %s", got, err, hash)
+	}
+	for _, unknown := range []ethrpc.Address{{19: 1}, {19: 2}} {
+		if _, err := client.Creation(t.Context(), unknown); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Creation of %s: got error %v, want ErrNotFound", unknown, err)
+		}
+	}
+}

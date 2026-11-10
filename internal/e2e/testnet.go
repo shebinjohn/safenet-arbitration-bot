@@ -38,6 +38,8 @@ type Testnet struct {
 	gateway *gateway
 	// sourcify is the Sourcify server that ServeSourcify starts, or nil.
 	sourcify *sourcify
+	// txService is the Safe Transaction Service that ServeTxService starts, or nil.
+	txService *txService
 }
 
 // safe is the Safe that proposes the transactions, on both chains.
@@ -171,9 +173,10 @@ func (n *Testnet) ExecCalldata(tx *safenet.SafeTransaction, owner ethrpc.Address
 
 // Arbot returns an Arbot configured to read both nodes, the IPFS gateway of
 // ServeIPFS if the test serves content, and the Sourcify server of
-// ServeSourcify if the test serves contracts. It first mines Mainnet blocks up
-// to the time of the latest Gnosis Chain block, so that arbot finds the Mainnet
-// block before each proposal.
+// ServeSourcify if the test serves contracts, and the Safe Transaction Service
+// of ServeTxService if the test lists executions. It first mines Mainnet blocks
+// up to the time of the latest Gnosis Chain block, so that arbot finds the
+// Mainnet block before each proposal.
 func (n *Testnet) Arbot() *Arbot {
 	n.tb.Helper()
 	n.Mainnet.MineUntil(n.Header(uint64(n.blockNumber())).Time())
@@ -184,7 +187,11 @@ func (n *Testnet) Arbot() *Arbot {
 	if n.sourcify != nil {
 		sourcify = n.sourcify.URL
 	}
-	return newArbot(n.tb, gateway, sourcify, n.Anvil, n.Mainnet)
+	a := newArbot(n.tb, gateway, sourcify, n.Anvil, n.Mainnet)
+	if n.txService != nil {
+		a.setTxService(n.tb, ethrpc.Mainnet, n.txService.URL)
+	}
+	return a
 }
 
 // calldata returns the calldata for calling the function with signature, such

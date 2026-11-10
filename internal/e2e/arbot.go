@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/cli"
@@ -53,6 +54,27 @@ func newArbot(tb testing.TB, gateway, sourcify string, nodes ...*Anvil) *Arbot {
 		tb.Fatal(err)
 	}
 	return &Arbot{config: path}
+}
+
+// setTxService configures arbot to use the Safe Transaction Service at the base
+// URL url for the chain with the ID chainID.
+func (a *Arbot) setTxService(tb testing.TB, chainID uint64, url string) {
+	tb.Helper()
+	data, err := os.ReadFile(a.config)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		tb.Fatal(err)
+	}
+	config["txServices"].(map[string]any)[strconv.FormatUint(chainID, 10)] = url
+	if data, err = json.Marshal(config); err != nil {
+		tb.Fatal(err)
+	}
+	if err := os.WriteFile(a.config, data, 0o644); err != nil {
+		tb.Fatal(err)
+	}
 }
 
 // Run runs arbot with args, and returns its stdout. It fails the test if arbot

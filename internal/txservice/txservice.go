@@ -34,7 +34,8 @@ var DefaultURLs = map[uint64]string{
 // transaction has calldata, which is bounded by the size of a block.
 const maxResponseSize = 8 << 20
 
-// ErrNotFound is the error for a transaction that the service doesn't have.
+// ErrNotFound is the error for a transaction or Safe that the service doesn't
+// have.
 var ErrNotFound = errors.New("transaction not found")
 
 // Client fetches Safe transactions from a Safe Transaction Service.
@@ -60,7 +61,99 @@ func (c *Client) Transaction(ctx context.Context, safeTxHash ethrpc.Hash) (*safe
 		return nil, err
 	}
 	// The service redirects paths without a trailing slash.
-	u += "/"
+	body, err := c.get(ctx, u+"/")
+	if err != nil {
+		return nil, err
+	}
+	var t transaction
+	if err := json.Unmarshal(body, &t); err != nil {
+		return nil, fmt.Errorf("decoding transaction: %w", err)
+	}
+	return t.safeTransaction(c.chainID), nil
+}
+
+// pageSize is the number of transactions that Executed asks the service for at
+// a time, and maxPages the most pages that it reads, which bounds the history
+// of a Safe that it lists.
+const (
+	pageSize = 50
+	maxPages = 200
+)
+
+// Execution is a Safe transaction that the service says a Safe executed.
+type Execution struct {
+	// Transaction is the Safe transaction, with its fields as the service reports
+	// them.
+	Transaction *safenet.SafeTransaction
+	// SafeTxHash, TxHash, and Block are the hash of the Safe transaction, the hash
+	// of the onchain transaction that executed it, and its block, as the service
+	// reports them.
+	SafeTxHash ethrpc.Hash
+	TxHash     ethrpc.Hash
+	Block      uint64
+}
+
+// Executed returns the Safe transactions that the service says the Safe
+// executed, in the order of their nonces, as the service reports them. They are
+// the multisig transactions that owners signed, so executions by modules aren't
+// included.
+func (c *Client) Executed(ctx context.Context, safe ethrpc.Address) ([]Execution, error) {
+	// The service rejects addresses without their EIP-55 checksum.
+	base, err := url.JoinPath(c.baseURL, "api", "v1", "safes", safe.String(), "multisig-transactions")
+	if err != nil {
+		return nil, err
+	}
+	executions := []Execution{}
+	for page := 0; ; page++ {
+		if page == maxPages {
+			return nil, fmt.Errorf("the Safe has more than %d executed transactions", maxPages*pageSize)
+		}
+		query := url.Values{
+			"executed": {"true"},
+			"ordering": {"nonce"},
+			"limit":    {fmt.Sprint(pageSize)},
+			"offset":   {fmt.Sprint(page * pageSize)},
+		}
+		body, err := c.get(ctx, base+"/?"+query.Encode())
+		if errors.Is(err, ErrNotFound) {
+			// The service doesn't know the Safe.
+			return executions, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		var result struct {
+			Results []struct {
+				transaction
+				SafeTxHash      ethrpc.Hash  `json:"safeTxHash"`
+				TransactionHash *ethrpc.Hash `json:"transactionHash"`
+				BlockNumber     *uint64      `json:"blockNumber"`
+				IsExecuted      bool         `json:"isExecuted"`
+			} `json:"results"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("decoding transactions: %w", err)
+		}
+		for _, t := range result.Results {
+			if !t.IsExecuted || t.TransactionHash == nil || t.BlockNumber == nil {
+				continue
+			}
+			executions = append(executions, Execution{
+				Transaction: t.safeTransaction(c.chainID),
+				SafeTxHash:  t.SafeTxHash,
+				TxHash:      *t.TransactionHash,
+				Block:       *t.BlockNumber,
+			})
+		}
+		if len(result.Results) < pageSize {
+			return executions, nil
+		}
+	}
+}
+
+// get fetches the URL u from the service, and returns the body of the response,
+// or ErrNotFound.
+func (c *Client) get(ctx context.Context, u string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -84,25 +177,28 @@ func (c *Client) Transaction(ctx context.Context, safeTxHash ethrpc.Hash) (*safe
 	case len(body) > maxResponseSize:
 		return nil, fmt.Errorf("response exceeds %d bytes", maxResponseSize)
 	}
+	return body, nil
+}
 
-	var t struct {
-		Safe           ethrpc.Address `json:"safe"`
-		To             ethrpc.Address `json:"to"`
-		Value          number         `json:"value"`
-		Data           *ethrpc.Bytes  `json:"data"`
-		Operation      uint8          `json:"operation"`
-		SafeTxGas      number         `json:"safeTxGas"`
-		BaseGas        number         `json:"baseGas"`
-		GasPrice       number         `json:"gasPrice"`
-		GasToken       ethrpc.Address `json:"gasToken"`
-		RefundReceiver ethrpc.Address `json:"refundReceiver"`
-		Nonce          number         `json:"nonce"`
-	}
-	if err := json.Unmarshal(body, &t); err != nil {
-		return nil, fmt.Errorf("decoding transaction: %w", err)
-	}
+// transaction is a Safe transaction as the service encodes it, with the fields
+// that the client uses.
+type transaction struct {
+	Safe           ethrpc.Address `json:"safe"`
+	To             ethrpc.Address `json:"to"`
+	Value          number         `json:"value"`
+	Data           *ethrpc.Bytes  `json:"data"`
+	Operation      uint8          `json:"operation"`
+	SafeTxGas      number         `json:"safeTxGas"`
+	BaseGas        number         `json:"baseGas"`
+	GasPrice       number         `json:"gasPrice"`
+	GasToken       ethrpc.Address `json:"gasToken"`
+	RefundReceiver ethrpc.Address `json:"refundReceiver"`
+	Nonce          number         `json:"nonce"`
+}
+
+func (t *transaction) safeTransaction(chainID *big.Int) *safenet.SafeTransaction {
 	tx := &safenet.SafeTransaction{
-		ChainID:        c.chainID,
+		ChainID:        new(big.Int).Set(chainID),
 		Safe:           t.Safe,
 		To:             t.To,
 		Value:          t.Value.Int,
@@ -117,7 +213,7 @@ func (c *Client) Transaction(ctx context.Context, safeTxHash ethrpc.Hash) (*safe
 	if t.Data != nil {
 		tx.Data = *t.Data
 	}
-	return tx, nil
+	return tx
 }
 
 // number is an integer that the service encodes as a JSON number or as a

@@ -1,7 +1,9 @@
 package txservice
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -124,5 +126,59 @@ func TestDefaultURLs(t *testing.T) {
 		if !strings.HasPrefix(DefaultURLs[chainID], "https://") {
 			t.Errorf("DefaultURLs[%d]: got %q, want an HTTPS URL", chainID, DefaultURLs[chainID])
 		}
+	}
+}
+
+func TestExecuted(t *testing.T) {
+	safe := ethrpc.MustParseAddress("0x5afE000000000000000000000000000000000001")
+	// pageSize+1 executed transactions, so that the client reads two pages, and one
+	// that isn't executed.
+	var results []map[string]any
+	for nonce := range pageSize + 1 {
+		results = append(results, map[string]any{
+			"safe": safe, "to": "0xa11ce00000000000000000000000000000000003", "value": "0", "data": nil,
+			"operation": 0, "safeTxGas": 0, "baseGas": 0, "gasPrice": "0",
+			"gasToken": "0x0000000000000000000000000000000000000000", "refundReceiver": "0x0000000000000000000000000000000000000000",
+			"nonce": nonce, "safeTxHash": ethrpc.Hash{31: byte(nonce)}, "transactionHash": ethrpc.Hash{0: 0xbb, 31: byte(nonce)},
+			"blockNumber": 100 + nonce, "isExecuted": true,
+		})
+	}
+	results = append(results, map[string]any{"safe": safe, "value": "0", "nonce": 99, "isExecuted": false, "transactionHash": nil, "blockNumber": nil})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The address has its checksum, which the service requires.
+		if r.URL.Path != "/api/v1/safes/"+safe.String()+"/multisig-transactions/" {
+			http.NotFound(w, r)
+			return
+		}
+		q := r.URL.Query()
+		if q.Get("executed") != "true" || q.Get("ordering") != "nonce" || q.Get("limit") != "50" {
+			http.Error(w, "unexpected query "+r.URL.RawQuery, http.StatusBadRequest)
+			return
+		}
+		var offset int
+		fmt.Sscan(q.Get("offset"), &offset)
+		page := results[min(offset, len(results)):min(offset+pageSize, len(results))]
+		json.NewEncoder(w).Encode(map[string]any{"count": len(results), "results": page})
+	}))
+	t.Cleanup(server.Close)
+
+	got, err := NewClient(server.URL, ethrpc.Mainnet).Executed(t.Context(), safe)
+	if err != nil {
+		t.Fatalf("Executed: %v", err)
+	}
+	if len(got) != pageSize+1 {
+		t.Fatalf("Executed: got %d executions, want %d", len(got), pageSize+1)
+	}
+	for i, e := range got {
+		if e.Transaction.Nonce.Int64() != int64(i) || e.SafeTxHash != (ethrpc.Hash{31: byte(i)}) ||
+			e.TxHash != (ethrpc.Hash{0: 0xbb, 31: byte(i)}) || e.Block != uint64(100+i) ||
+			e.Transaction.Safe != safe || e.Transaction.ChainID.Int64() != 1 {
+			t.Errorf("execution %d: got %+v with transaction %+v", i, e, e.Transaction)
+		}
+	}
+
+	// A Safe that the service doesn't know has no executions.
+	if got, err := NewClient(server.URL, ethrpc.Mainnet).Executed(t.Context(), ethrpc.Address{19: 1}); err != nil || len(got) != 0 {
+		t.Errorf("Executed of an unknown Safe: got %v, %v, want no executions", got, err)
 	}
 }

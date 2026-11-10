@@ -150,9 +150,9 @@ func (d *decoder) candidate(input []byte, e Execution, nonce *big.Int) *safenet.
 	return tx
 }
 
-func (d *decoder) warn(err error) {
-	if d.Warn != nil {
-		d.Warn(err)
+func (f *Finder) warn(err error) {
+	if f.Warn != nil {
+		f.Warn(err)
 	}
 }
 

@@ -34,6 +34,8 @@ type chain struct {
 	// traces are the callTracer results by transaction hash. A transaction without
 	// one fails to trace, like on a node that doesn't serve traces.
 	traces map[ethrpc.Hash]any
+	// receipts are the receipts by transaction hash.
+	receipts map[ethrpc.Hash]ethrpc.Receipt
 }
 
 // serve starts the node, and returns a client for it.
@@ -81,6 +83,14 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 			json.Unmarshal(req.Params[0], &hash)
 			if tx, ok := c.txs[hash]; ok {
 				res["result"] = tx
+			} else {
+				res["result"] = nil
+			}
+		case "eth_getTransactionReceipt":
+			var hash ethrpc.Hash
+			json.Unmarshal(req.Params[0], &hash)
+			if receipt, ok := c.receipts[hash]; ok {
+				res["result"] = receipt
 			} else {
 				res["result"] = nil
 			}

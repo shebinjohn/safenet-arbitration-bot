@@ -35,6 +35,7 @@ var commands = map[string]struct {
 	"contract-source": {contractSourceCommand, "print the source code of a contract on the Safe's chain of a Safenet request"},
 	"classify":        {classify, "classify a Safenet request with deterministic Charter checks"},
 	"index":           {indexCommand, "index the arbitrator's rulings into the rulings corpus"},
+	"history":         {historyCommand, "list the Safe transactions that the Safe of a Safenet request executed, from the Safe Transaction Service"},
 	"info":            {info, "show a Safenet request, its proposal, votes, and arbitration"},
 	"pending":         {pending, "list the disputed Safenet requests awaiting arbitration"},
 	"safe":            {safeCommand, "show the settings of the Safe of a Safenet request"},

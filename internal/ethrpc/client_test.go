@@ -510,6 +510,13 @@ func TestTransient(t *testing.T) {
 		{fmt.Errorf("eth_getTransactionReceipt: transaction 0x01: %w", ErrNotFound), false},
 		{fmt.Errorf("eth_call: %w", &Error{Code: -32000, Message: "execution reverted"}), false},
 		{errors.New("HTTP 429 Too Many Requests"), true},
+		// A rate limit with a JSON-RPC error in the body, or with HTTP status 200, and
+		// a server error.
+		{fmt.Errorf("eth_getTransactionReceipt: %w", &HTTPError{Status: "429 Too Many Requests", StatusCode: 429, Err: &Error{Code: -32016, Message: "over rate limit"}}), true},
+		{fmt.Errorf("eth_call: %w", &Error{Code: -32005, Message: "Rate limit exceeded"}), true},
+		{fmt.Errorf("eth_call: %w", &HTTPError{Status: "500 Internal Server Error", StatusCode: 500, Body: "error"}), true},
+		// A node that refuses the method answers.
+		{fmt.Errorf("eth_call: %w", &HTTPError{Status: "403 Forbidden", StatusCode: 403, Err: &Error{Code: -32601, Message: "rpc method is not whitelisted"}}), false},
 	} {
 		if got := Transient(test.err); got != test.want {
 			t.Errorf("Transient(%v) = %v, want %v", test.err, got, test.want)

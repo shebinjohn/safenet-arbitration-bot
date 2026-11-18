@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -126,16 +127,51 @@ func (c *Client) GetLogs(ctx context.Context, filter LogFilter) ([]Log, error) {
 // ErrNotFound is the error for a transaction that the node doesn't have.
 var ErrNotFound = errors.New("not found")
 
+// HTTPError is a response with an HTTP error status, which may have a JSON-RPC
+// error in its body, such as for a rate limit or a block range that is too
+// large.
+type HTTPError struct {
+	Status     string
+	StatusCode int
+	// Err is the JSON-RPC error in the body, or nil if it has none, and Body is the
+	// start of the body otherwise.
+	Err  *Error
+	Body string
+}
+
+func (e *HTTPError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("HTTP %s: %v", e.Status, e.Err)
+	}
+	return fmt.Sprintf("HTTP %s: %s", e.Status, e.Body)
+}
+
+func (e *HTTPError) Unwrap() error {
+	if e.Err == nil {
+		return nil
+	}
+	return e.Err
+}
+
+// rateLimitCodes are the JSON-RPC error codes that public nodes use for rate
+// limits, which some send with HTTP status 200.
+var rateLimitCodes = []int{-32005, -32016, -32029}
+
 // Transient reports whether err is a failure to get an answer from the node,
-// such as a rate limit or a dropped connection, rather than the node's answer:
-// a JSON-RPC error, or that it doesn't have what was asked for. A request that
-// failed transiently says nothing about the chain, so it can be tried again.
+// such as a rate limit, a server error, or a dropped connection, rather than
+// the node's answer: a JSON-RPC error, a rejected request, or that it doesn't
+// have what was asked for. A request that failed transiently says nothing about
+// the chain, so it can be tried again.
 func Transient(err error) bool {
 	if err == nil || errors.Is(err, ErrNotFound) {
 		return false
 	}
-	_, ok := errors.AsType[*Error](err)
-	return !ok
+	if httpErr, ok := errors.AsType[*HTTPError](err); ok {
+		return httpErr.StatusCode == http.StatusTooManyRequests || httpErr.StatusCode >= 500 ||
+			(httpErr.Err != nil && slices.Contains(rateLimitCodes, httpErr.Err.Code))
+	}
+	rpcErr, ok := errors.AsType[*Error](err)
+	return !ok || slices.Contains(rateLimitCodes, rpcErr.Code)
 }
 
 // GetTransactionByHash returns the transaction with the given hash
@@ -232,11 +268,14 @@ func (c *Client) RawRequest(ctx context.Context, result any, method string, para
 		// Some nodes reject requests with an HTTP error status and a JSON-RPC error in
 		// the body, such as for a block range that is too large.
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		httpErr := &HTTPError{Status: resp.Status, StatusCode: resp.StatusCode}
 		var res response
 		if json.Unmarshal(body, &res) == nil && res.Error != nil {
-			return fmt.Errorf("%s: HTTP %s: %w", method, resp.Status, res.Error)
+			httpErr.Err = res.Error
+		} else {
+			httpErr.Body = string(bytes.TrimSpace(body[:min(len(body), 512)]))
 		}
-		return fmt.Errorf("%s: HTTP %s: %s", method, resp.Status, bytes.TrimSpace(body[:min(len(body), 512)]))
+		return fmt.Errorf("%s: %w", method, httpErr)
 	}
 
 	var res response

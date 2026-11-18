@@ -279,6 +279,22 @@ func (d *Decoder) Tuple(i int) *Decoder {
 	return &Decoder{data: d.data[offset:], err: d.err}
 }
 
+// Array returns the length of the i-th value, a dynamic array, and a decoder
+// for its elements, whose head has one word for each element.
+func (d *Decoder) Array(i int) (int, *Decoder) {
+	offset := d.Uint64(i)
+	length := d.uint64(d.word(offset), fmt.Sprintf("length of value %d", i))
+	if *d.err != nil {
+		return 0, &Decoder{err: d.err}
+	}
+	start := offset + 32
+	if length > (uint64(len(d.data))-start)/32 {
+		d.fail("value %d of %d elements exceeds data of %d bytes", i, length, len(d.data))
+		return 0, &Decoder{err: d.err}
+	}
+	return int(length), &Decoder{data: d.data[start:], err: d.err}
+}
+
 func isZero(b []byte) bool {
 	return !slices.ContainsFunc(b, func(x byte) bool { return x != 0 })
 }

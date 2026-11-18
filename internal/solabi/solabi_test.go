@@ -148,6 +148,23 @@ func TestDecoder(t *testing.T) {
 	}
 }
 
+func TestDecoderArray(t *testing.T) {
+	d := NewDecoder(Encode([]ethrpc.Address{{19: 0xaa}, {19: 0xbb}}, uint64(7), []ethrpc.Address{}))
+	n, elems := d.Array(0)
+	if n != 2 || elems.Address(0) != (ethrpc.Address{19: 0xaa}) || elems.Address(1) != (ethrpc.Address{19: 0xbb}) {
+		t.Errorf("Array(0): got %d elements, %s and %s", n, elems.Address(0), elems.Address(1))
+	}
+	if got := d.Uint64(1); got != 7 {
+		t.Errorf("Uint64: got %d, want 7", got)
+	}
+	if n, _ := d.Array(2); n != 0 {
+		t.Errorf("Array(2): got %d elements, want none", n)
+	}
+	if err := d.Err(); err != nil {
+		t.Errorf("Err: %v", err)
+	}
+}
+
 func TestDecoderErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -172,6 +189,15 @@ func TestDecoderErrors(t *testing.T) {
 			0000000000000000000000000000000000000000000000000000000000000020
 			000000000000000000000000000000000000000000000000ffffffffffffffff`,
 			func(d *Decoder) { d.String(0) }},
+		{"array length out of range", `
+			0000000000000000000000000000000000000000000000000000000000000020
+			0000000000000000000000000000000000000000000000000000000000000002
+			00000000000000000000000000000000000000000000000000000000000000aa`,
+			func(d *Decoder) { d.Array(0) }},
+		{"huge array length", `
+			0000000000000000000000000000000000000000000000000000000000000020
+			000000000000000000000000000000000000000000000000ffffffffffffffff`,
+			func(d *Decoder) { d.Array(0) }},
 		{"tuple out of range", "0000000000000000000000000000000000000000000000000000000000000040",
 			func(d *Decoder) { d.Tuple(0).Uint(0) }},
 		{"nested error", "0000000000000000000000000000000000000000000000000000000000000020",

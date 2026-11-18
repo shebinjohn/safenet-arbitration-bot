@@ -25,7 +25,10 @@ type simulateOutput struct {
 		Status   string `json:"status"`
 		Function *struct {
 			Signature string `json:"signature"`
-			Outputs   []any  `json:"outputs"`
+			Inputs    []struct {
+				Type string `json:"type"`
+			} `json:"inputs"`
+			Outputs []any `json:"outputs"`
 		} `json:"function"`
 		Source *struct {
 			URL string `json:"url"`
@@ -75,6 +78,7 @@ func TestSimulate(t *testing.T) {
 	if got.ChainID != ethrpc.Mainnet || got.Safe != tx.Safe || got.Number != 1 || !got.First || got.Call.Kind != "root" ||
 		got.Result.Status != "reverted" || got.Result.Function == nil ||
 		got.Result.Function.Signature != "addOwnerWithThreshold(address,uint256)" || got.Result.Function.Outputs != nil ||
+		len(got.Result.Function.Inputs) != 2 || got.Result.Function.Inputs[0].Type != "address" ||
 		got.Result.Source == nil {
 		t.Errorf("simulate: got %+v, want a reverted root call of addOwnerWithThreshold", got)
 	}

@@ -104,7 +104,7 @@ func TestCall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Call: %v", err)
 	}
-	want := &Function{Signature: "create(address)", Outputs: []Output{
+	want := &Function{Signature: "create(address)", Inputs: []Value{{"gauge", "address", ethrpc.Address{19: 9}}}, Outputs: []Value{
 		{"vault", "address", created},
 		{"", "uint256", "7"},
 		{"ok", "bool", true},
@@ -127,8 +127,8 @@ func TestCallReverted(t *testing.T) {
 		t.Fatalf("Call: %v", err)
 	}
 	if got.Status != Reverted || !strings.Contains(got.RevertReason, "exists") || got.ReturnData.String() != "0x08c379a0" ||
-		got.Function == nil || got.Function.Outputs != nil {
-		t.Errorf("Call: got %+v, want a revert with its data and no outputs", got)
+		got.Function == nil || got.Function.Outputs != nil || len(got.Function.Inputs) != 1 {
+		t.Errorf("Call: got %+v, want a revert with its data, its input, and no outputs", got)
 	}
 	if _, ok := n.last["value"]; ok {
 		t.Errorf("eth_call without value: got %v", n.last)
@@ -155,5 +155,44 @@ func TestCallUndecoded(t *testing.T) {
 	}
 	if _, err := Call(t.Context(), eth, &repository{}, safe, target, nil, nil, safenet.OperationCall, code, 99); err == nil {
 		t.Errorf("Call at a block that the node doesn't have: expected an error")
+	}
+}
+
+func TestCallInputs(t *testing.T) {
+	const abi = `[{"type": "function", "name": "set", "inputs": [{"name": "pid", "type": "uint256"},
+		{"name": "depositors", "type": "address[]"}, {"name": "approved", "type": "bool"},
+		{"name": "payload", "type": "bytes"}, {"name": "note", "type": "string"}, {"name": "ids", "type": "uint8[]"}],
+		"outputs": [], "stateMutability": "nonpayable"}]`
+	depositors := []ethrpc.Address{{19: 0xaa}, {19: 0xbb}}
+	data := solabi.Call(solabi.Selector("set(uint256,address[],bool,bytes,string,uint8[])"),
+		uint64(3), depositors, true, []byte{0xca, 0xfe}, "hi", []ethrpc.Address{{19: 1}})
+	n := &node{result: ethrpc.Bytes{}}
+	got, err := Call(t.Context(), n.serve(t), verified(t, abi), safe, target, nil, data, safenet.OperationCall, code, 100)
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	want := []Value{
+		{"pid", "uint256", "3"},
+		{"depositors", "address[]", []any{depositors[0], depositors[1]}},
+		{"approved", "bool", true},
+		{"payload", "bytes", ethrpc.Bytes{0xca, 0xfe}},
+		{"note", "string", "hi"},
+		{"ids", "uint8[]", []any{"1"}},
+	}
+	if got.Function == nil || !reflect.DeepEqual(got.Function.Inputs, want) || len(got.Function.Outputs) != 0 {
+		t.Errorf("Call: got function %+v, want inputs %+v", got.Function, want)
+	}
+
+	// An argument of a type that isn't decoded, and malformed data, leave the
+	// inputs out.
+	const tuple = `[{"type": "function", "name": "create", "inputs": [{"name": "c", "type": "tuple", "components": [{"type": "address"}]}],
+		"outputs": [], "stateMutability": "nonpayable"}]`
+	got, err = Call(t.Context(), n.serve(t), verified(t, tuple), safe, target, nil, solabi.Call(solabi.Selector("create((address))"), created), safenet.OperationCall, code, 100)
+	if err != nil || got.Function == nil || got.Function.Inputs != nil {
+		t.Errorf("Call with a tuple input: got %+v, %v", got.Function, err)
+	}
+	got, err = Call(t.Context(), n.serve(t), verified(t, factoryABI), safe, target, nil, create[:], safenet.OperationCall, code, 100)
+	if err != nil || got.Function == nil || got.Function.Inputs != nil {
+		t.Errorf("Call with no arguments in its data: got %+v, %v", got.Function, err)
 	}
 }

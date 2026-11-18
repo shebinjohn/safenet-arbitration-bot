@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -115,12 +116,41 @@ func simulateCommand(ctx context.Context, e *env, args []string) error {
 	}
 	if f := result.Function; f != nil {
 		fmt.Fprintf(e.stdout, "  Function  %s\n", f.Signature)
+		for _, in := range f.Inputs {
+			fmt.Fprintf(e.stdout, "  input  %s %s = %s\n", in.Type, cmp.Or(in.Name, "-"), valueText(in.Type, in.Value))
+		}
 		for _, o := range f.Outputs {
-			fmt.Fprintf(e.stdout, "  %s %s = %v\n", o.Type, cmp.Or(o.Name, "-"), o.Value)
+			fmt.Fprintf(e.stdout, "  output %s %s = %s\n", o.Type, cmp.Or(o.Name, "-"), valueText(o.Type, o.Value))
 		}
 	}
 	fmt.Fprintf(e.stdout, "  Returned  %s\n", wordsText(result.ReturnData))
 	return nil
+}
+
+// valueText formats a decoded value of type typ: a string quoted, bytes longer
+// than 32 bytes shortened to their first 4 bytes and length, and an array's
+// elements in brackets.
+func valueText(typ string, value any) string {
+	switch v := value.(type) {
+	case ethrpc.Bytes:
+		if len(v) > 32 {
+			return summarizeData(v)
+		}
+		return v.String()
+	case string:
+		if typ == "string" {
+			return strconv.Quote(v)
+		}
+		return v
+	case []any:
+		elem := strings.TrimSuffix(typ, "[]")
+		elems := make([]string, len(v))
+		for i, e := range v {
+			elems[i] = valueText(elem, e)
+		}
+		return "[" + strings.Join(elems, ", ") + "]"
+	}
+	return fmt.Sprint(value)
 }
 
 // wordsText formats data as its 32-byte words, one per line, or "-" for none.

@@ -1,6 +1,7 @@
 // Package simulate runs a call that a Safe transaction makes with eth_call,
-// from the Safe, on the state of the Safe's chain at a block, and decodes what
-// it returns with the ABI that Sourcify verified for the account that it calls.
+// from the Safe, on the state of the Safe's chain at a block, and decodes its
+// arguments and what it returns with the ABI that Sourcify verified for the
+// account that it calls.
 //
 // A simulation shows what the call would do on that state, which is onchain
 // data (Charter § 2.8), not the effects of the transaction after the proposal.
@@ -50,17 +51,23 @@ type Result struct {
 	Source *sourcify.Record `json:"source"`
 }
 
-// Function is a called function, with the values that it returned.
+// Function is a called function, with the arguments that the call passes and
+// the values that it returned.
 type Function struct {
 	Signature string `json:"signature"`
+	// Inputs are the arguments that the call's data passes, decoded with the
+	// function's ABI, or nil if an argument has a type that isn't decoded or the
+	// data is malformed. Addresses, booleans, unsigned integers, fixed-size byte
+	// arrays, bytes, strings, and dynamic arrays of the static types are decoded.
+	Inputs []Value `json:"inputs"`
 	// Outputs are the returned values, or nil if the call reverted or a value has a
 	// type that isn't decoded: only addresses, booleans, unsigned integers, and
 	// fixed-size byte arrays are.
-	Outputs []Output `json:"outputs"`
+	Outputs []Value `json:"outputs"`
 }
 
-// Output is a value that a function returned.
-type Output struct {
+// Value is an argument that a call passes or a value that a function returned.
+type Value struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
 	Value any    `json:"value"`
@@ -108,7 +115,7 @@ func Call(ctx context.Context, eth *ethrpc.Client, repo sourcify.Repository, saf
 		if err != nil || solabi.Selector(signature) != [4]byte(data[:4]) {
 			continue
 		}
-		result.Function = &Function{Signature: signature}
+		result.Function = &Function{Signature: signature, Inputs: decodeInputs(entry.Inputs, data[4:])}
 		if result.Status == Success {
 			result.Function.Outputs = decodeOutputs(entry.Outputs, result.ReturnData)
 		}
@@ -120,28 +127,76 @@ func Call(ctx context.Context, eth *ethrpc.Client, repo sourcify.Repository, saf
 // decodeOutputs decodes the values of a function's outputs from its return
 // data, or returns nil if one has a type that isn't decoded or the data is
 // malformed.
-func decodeOutputs(params []solabi.ABIParam, data []byte) []Output {
+func decodeOutputs(params []solabi.ABIParam, data []byte) []Value {
 	d := solabi.NewDecoder(data)
-	outputs := make([]Output, len(params))
+	outputs := make([]Value, len(params))
 	for i, p := range params {
-		outputs[i] = Output{Name: p.Name, Type: p.Type}
-		switch {
-		case p.Type == "address":
-			outputs[i].Value = d.Address(i)
-		case p.Type == "bool":
-			outputs[i].Value = d.Bool(i)
-		case strings.HasPrefix(p.Type, "uint") && !strings.Contains(p.Type, "["):
-			outputs[i].Value = d.Uint(i).String()
-		case strings.HasPrefix(p.Type, "bytes") && len(p.Type) > len("bytes") && !strings.Contains(p.Type, "["):
-			outputs[i].Value = ethrpc.Bytes(sizedBytes(d.Bytes32(i), p.Type))
-		default:
+		value, ok := decodeStatic(d, i, p.Type)
+		if !ok {
 			return nil
 		}
+		outputs[i] = Value{Name: p.Name, Type: p.Type, Value: value}
 	}
 	if d.Err() != nil {
 		return nil
 	}
 	return outputs
+}
+
+// decodeInputs decodes the arguments of a call from its data after the
+// selector, or returns nil if one has a type that isn't decoded or the data is
+// malformed.
+func decodeInputs(params []solabi.ABIParam, data []byte) []Value {
+	d := solabi.NewDecoder(data)
+	inputs := make([]Value, len(params))
+	for i, p := range params {
+		var value any
+		switch elem, isArray := strings.CutSuffix(p.Type, "[]"); {
+		case p.Type == "bytes":
+			value = ethrpc.Bytes(d.Bytes(i))
+		case p.Type == "string":
+			value = d.String(i)
+		case isArray && !strings.ContainsAny(elem, "[("):
+			n, elems := d.Array(i)
+			values := make([]any, n)
+			for j := range n {
+				v, ok := decodeStatic(elems, j, elem)
+				if !ok {
+					return nil
+				}
+				values[j] = v
+			}
+			value = values
+		default:
+			v, ok := decodeStatic(d, i, p.Type)
+			if !ok {
+				return nil
+			}
+			value = v
+		}
+		inputs[i] = Value{Name: p.Name, Type: p.Type, Value: value}
+	}
+	if d.Err() != nil {
+		return nil
+	}
+	return inputs
+}
+
+// decodeStatic decodes the i-th value of d, of an address, boolean, unsigned
+// integer, or fixed-size byte array type, and reports whether typ is one of
+// them.
+func decodeStatic(d *solabi.Decoder, i int, typ string) (any, bool) {
+	switch {
+	case typ == "address":
+		return d.Address(i), true
+	case typ == "bool":
+		return d.Bool(i), true
+	case strings.HasPrefix(typ, "uint") && !strings.Contains(typ, "["):
+		return d.Uint(i).String(), true
+	case strings.HasPrefix(typ, "bytes") && len(typ) > len("bytes") && !strings.Contains(typ, "["):
+		return ethrpc.Bytes(sizedBytes(d.Bytes32(i), typ)), true
+	}
+	return nil, false
 }
 
 // sizedBytes returns the first bytes of a word that a bytesN value has.

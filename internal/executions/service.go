@@ -106,6 +106,18 @@ func (f *Finder) FromService(ctx context.Context, safe ethrpc.Address, to ethrpc
 		}
 		e, ok := executionIn(receipt, safe, l.SafeTxHash)
 		if !ok {
+			// Public nodes behind load balancers now and then serve a receipt without its
+			// logs, so the receipt is read once more before the execution is rejected.
+			r, err := f.Eth.GetTransactionReceipt(ctx, l.TxHash)
+			if ethrpc.Transient(err) {
+				return nil, fmt.Errorf("getting the receipt of %s: %w", l.TxHash, err)
+			}
+			if err == nil && r.BlockNumber <= to {
+				receipts[l.TxHash] = &r
+				e, ok = executionIn(&r, safe, l.SafeTxHash)
+			}
+		}
+		if !ok {
 			reject("the onchain transaction logged no execution of it by the Safe")
 			continue
 		}

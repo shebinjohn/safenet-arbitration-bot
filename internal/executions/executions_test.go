@@ -38,6 +38,9 @@ type chain struct {
 	receipts map[ethrpc.Hash]ethrpc.Receipt
 	// created is the block from which the Safe has code, or 0 if it has none.
 	created uint64
+	// withoutLogs are the transactions whose receipt the node serves without its
+	// logs the first time, like a node behind a load balancer that is behind.
+	withoutLogs map[ethrpc.Hash]bool
 	// unavailable makes the node fail eth_getTransactionReceipt with an HTTP error,
 	// like a node that rate limits the client.
 	unavailable bool
@@ -107,6 +110,10 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 			var hash ethrpc.Hash
 			json.Unmarshal(req.Params[0], &hash)
 			if receipt, ok := c.receipts[hash]; ok {
+				if c.withoutLogs[hash] {
+					delete(c.withoutLogs, hash)
+					receipt.Logs = nil
+				}
 				res["result"] = receipt
 			} else {
 				res["result"] = nil

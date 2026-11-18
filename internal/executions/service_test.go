@@ -227,3 +227,22 @@ func TestFromServiceUnavailable(t *testing.T) {
 		t.Errorf("FromService with an unavailable node: got %+v, %v, want an error about the receipt", got, err)
 	}
 }
+
+func TestFromServiceReceiptWithoutLogs(t *testing.T) {
+	// A receipt served once without its logs is read again, so the execution is
+	// confirmed rather than rejected.
+	tx := transaction("first", 0)
+	c := &chain{
+		nonce:       big.NewInt(1),
+		receipts:    map[ethrpc.Hash]ethrpc.Receipt{hash(1): {TransactionHash: hash(1), BlockNumber: 120, Status: 1, Logs: []ethrpc.Log{executionLog(executionSuccessEvent, tx.Hash(), hash(1), true, 120, 0)}}},
+		withoutLogs: map[ethrpc.Hash]bool{hash(1): true},
+	}
+	f := &Finder{Eth: c.serve(t), Service: listingService(t, []listed{{tx, tx.Hash(), hash(1), 120}})}
+	got, err := f.FromService(t.Context(), safe, 200)
+	if err != nil {
+		t.Fatalf("FromService: %v", err)
+	}
+	if len(got.Executions) != 1 || len(got.Rejected) != 0 || len(got.Missing) != 0 {
+		t.Errorf("FromService: got %d executions, %v rejected, and %v missing, want the execution confirmed", len(got.Executions), got.Rejected, got.Missing)
+	}
+}

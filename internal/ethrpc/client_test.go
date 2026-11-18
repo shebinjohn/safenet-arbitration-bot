@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -497,5 +498,21 @@ func TestNewClientConnectionError(t *testing.T) {
 	t.Cleanup(server.Close)
 	if _, err := NewClient(t.Context(), testChainID, server.URL); err == nil {
 		t.Fatal("NewClient: expected an error")
+	}
+}
+
+func TestTransient(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want bool
+	}{
+		{nil, false},
+		{fmt.Errorf("eth_getTransactionReceipt: transaction 0x01: %w", ErrNotFound), false},
+		{fmt.Errorf("eth_call: %w", &Error{Code: -32000, Message: "execution reverted"}), false},
+		{errors.New("HTTP 429 Too Many Requests"), true},
+	} {
+		if got := Transient(test.err); got != test.want {
+			t.Errorf("Transient(%v) = %v, want %v", test.err, got, test.want)
+		}
 	}
 }

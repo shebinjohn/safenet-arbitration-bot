@@ -203,8 +203,9 @@ func TestCreationFromService(t *testing.T) {
 			f := &Finder{Eth: c.serve(t), Service: listingService(t, nil, test.creation...)}
 			var warnings []error
 			f.Warn = func(err error) { warnings = append(warnings, err) }
-			if got := f.CreationFromService(t.Context(), safe, last); !reflect.DeepEqual(got, test.want) {
-				t.Errorf("CreationFromService: got %+v, want %+v", got, test.want)
+			got, err := f.CreationFromService(t.Context(), safe, last)
+			if err != nil || !reflect.DeepEqual(got, test.want) {
+				t.Errorf("CreationFromService: got %+v, %v, want %+v", got, err, test.want)
 			}
 			switch {
 			case test.warning == "" && len(warnings) != 0:
@@ -213,5 +214,16 @@ func TestCreationFromService(t *testing.T) {
 				t.Errorf("warnings: got %v, want one containing %q", warnings, test.warning)
 			}
 		})
+	}
+}
+
+func TestFromServiceUnavailable(t *testing.T) {
+	// A receipt that the node fails to serve says nothing about the execution, so
+	// FromService fails rather than reject it.
+	tx := transaction("first", 0)
+	c := &chain{nonce: big.NewInt(1), unavailable: true}
+	f := &Finder{Eth: c.serve(t), Service: listingService(t, []listed{{tx, tx.Hash(), hash(1), 120}})}
+	if got, err := f.FromService(t.Context(), safe, 200); err == nil || !strings.Contains(err.Error(), "receipt") {
+		t.Errorf("FromService with an unavailable node: got %+v, %v, want an error about the receipt", got, err)
 	}
 }

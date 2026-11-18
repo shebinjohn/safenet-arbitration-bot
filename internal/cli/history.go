@@ -108,8 +108,10 @@ func historyCommand(ctx context.Context, e *env, args []string) error {
 		Safe: ref.Safe, ChainID: ref.ChainID, SafeBlock: ref.SafeBlock,
 		Service: serviceSource{URL: baseURL, ObservedAt: observed},
 		Nonce:   history.Nonce, Missing: history.Missing,
-		Creation:   finder.CreationFromService(ctx, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock)),
 		Executions: []execution{}, Rejected: history.Rejected,
+	}
+	if report.Creation, err = finder.CreationFromService(ctx, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock)); err != nil {
+		return err
 	}
 	var reader *checks.CallReader
 	if *withCalls {

@@ -123,6 +123,21 @@ func (c *Client) GetLogs(ctx context.Context, filter LogFilter) ([]Log, error) {
 	return result, err
 }
 
+// ErrNotFound is the error for a transaction that the node doesn't have.
+var ErrNotFound = errors.New("not found")
+
+// Transient reports whether err is a failure to get an answer from the node,
+// such as a rate limit or a dropped connection, rather than the node's answer:
+// a JSON-RPC error, or that it doesn't have what was asked for. A request that
+// failed transiently says nothing about the chain, so it can be tried again.
+func Transient(err error) bool {
+	if err == nil || errors.Is(err, ErrNotFound) {
+		return false
+	}
+	_, ok := errors.AsType[*Error](err)
+	return !ok
+}
+
 // GetTransactionByHash returns the transaction with the given hash
 // (eth_getTransactionByHash).
 func (c *Client) GetTransactionByHash(ctx context.Context, hash Hash) (Transaction, error) {
@@ -131,7 +146,7 @@ func (c *Client) GetTransactionByHash(ctx context.Context, hash Hash) (Transacti
 		return Transaction{}, err
 	}
 	if result == nil {
-		return Transaction{}, fmt.Errorf("eth_getTransactionByHash: transaction %s not found", hash)
+		return Transaction{}, fmt.Errorf("eth_getTransactionByHash: transaction %s: %w", hash, ErrNotFound)
 	}
 	return *result, nil
 }
@@ -144,7 +159,7 @@ func (c *Client) GetTransactionReceipt(ctx context.Context, hash Hash) (Receipt,
 		return Receipt{}, err
 	}
 	if result == nil {
-		return Receipt{}, fmt.Errorf("eth_getTransactionReceipt: transaction %s not found", hash)
+		return Receipt{}, fmt.Errorf("eth_getTransactionReceipt: transaction %s: %w", hash, ErrNotFound)
 	}
 	return *result, nil
 }

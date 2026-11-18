@@ -38,6 +38,9 @@ type chain struct {
 	receipts map[ethrpc.Hash]ethrpc.Receipt
 	// created is the block from which the Safe has code, or 0 if it has none.
 	created uint64
+	// unavailable makes the node fail eth_getTransactionReceipt with an HTTP error,
+	// like a node that rate limits the client.
+	unavailable bool
 }
 
 // serve starts the node, and returns a client for it.
@@ -97,6 +100,10 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 				res["result"] = "0x"
 			}
 		case "eth_getTransactionReceipt":
+			if c.unavailable {
+				http.Error(w, "error code: 1015", http.StatusInternalServerError)
+				return
+			}
 			var hash ethrpc.Hash
 			json.Unmarshal(req.Params[0], &hash)
 			if receipt, ok := c.receipts[hash]; ok {

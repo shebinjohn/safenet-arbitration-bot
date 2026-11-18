@@ -86,9 +86,13 @@ func (f *Finder) FromService(ctx context.Context, safe ethrpc.Address, to ethrpc
 		receipt, ok := receipts[l.TxHash]
 		if !ok {
 			r, err := f.Eth.GetTransactionReceipt(ctx, l.TxHash)
-			if err != nil {
+			switch {
+			case ethrpc.Transient(err):
+				// A receipt that couldn't be read says nothing about the execution.
+				return nil, fmt.Errorf("getting the receipt of %s: %w", l.TxHash, err)
+			case err != nil:
 				f.warn(fmt.Errorf("getting the receipt of %s: %w", l.TxHash, err))
-			} else {
+			default:
 				receipt = &r
 			}
 			receipts[l.TxHash] = receipt
@@ -113,6 +117,9 @@ func (f *Finder) FromService(ctx context.Context, safe ethrpc.Address, to ethrpc
 	})
 
 	result, err := f.Eth.Call(ctx, ethrpc.CallRequest{To: safe, Data: solabi.Call(nonceSelector)}, to)
+	if ethrpc.Transient(err) {
+		return nil, fmt.Errorf("reading the nonce of %s at block %d: %w", safe, to, err)
+	}
 	if err != nil {
 		f.warn(fmt.Errorf("reading the nonce of %s at block %d: %w", safe, to, err))
 		return h, nil
@@ -185,37 +192,48 @@ type Creation struct {
 // confirms it: the transaction's receipt is in a block up to to, the account
 // has no code at the block before it, and has code at its block. It returns
 // nil, with a warning, if the service doesn't have it or the chain doesn't
-// confirm it, such as for a node that doesn't serve the code at old blocks.
-func (f *Finder) CreationFromService(ctx context.Context, safe ethrpc.Address, to ethrpc.BlockNumber) *Creation {
+// confirm it, such as for a node that doesn't serve the code at old blocks. It
+// fails if a node request fails transiently, such as for a rate limit, since
+// that says nothing about the creation.
+func (f *Finder) CreationFromService(ctx context.Context, safe ethrpc.Address, to ethrpc.BlockNumber) (*Creation, error) {
 	if f.Service == nil {
-		return nil
+		return nil, nil
 	}
 	hash, err := f.Service.Creation(ctx, safe)
 	if err != nil {
 		f.warn(fmt.Errorf("getting the creation of %s from the Safe Transaction Service: %w", safe, err))
-		return nil
+		return nil, nil
 	}
 	receipt, err := f.Eth.GetTransactionReceipt(ctx, hash)
+	if ethrpc.Transient(err) {
+		return nil, fmt.Errorf("getting the receipt of the creation %s: %w", hash, err)
+	}
 	if err != nil {
 		f.warn(fmt.Errorf("getting the receipt of the creation %s: %w", hash, err))
-		return nil
+		return nil, nil
 	}
 	block := receipt.BlockNumber
 	if block > to || block == 0 {
-		return nil
+		return nil, nil
 	}
 	before, err := f.Eth.GetCode(ctx, safe, block-1)
-	if err == nil && len(before) == 0 {
-		var after ethrpc.Bytes
-		if after, err = f.Eth.GetCode(ctx, safe, block); err == nil && len(after) == 0 {
-			err = fmt.Errorf("the account has no code at block %d", block)
-		}
-	} else if err == nil {
+	var after ethrpc.Bytes
+	if err == nil {
+		after, err = f.Eth.GetCode(ctx, safe, block)
+	}
+	if ethrpc.Transient(err) {
+		return nil, fmt.Errorf("confirming the creation %s of %s: %w", hash, safe, err)
+	}
+	switch {
+	case err != nil:
+	case len(before) != 0:
 		err = fmt.Errorf("the account has code at block %d, before it", block-1)
+	case len(after) == 0:
+		err = fmt.Errorf("the account has no code at block %d", block)
 	}
 	if err != nil {
 		f.warn(fmt.Errorf("confirming the creation %s of %s: %w", hash, safe, err))
-		return nil
+		return nil, nil
 	}
 	c := &Creation{Block: uint64(block), TxHash: hash}
 	for _, log := range receipt.Logs {
@@ -235,5 +253,5 @@ func (f *Finder) CreationFromService(ctx context.Context, safe ethrpc.Address, t
 			break
 		}
 	}
-	return c
+	return c, nil
 }

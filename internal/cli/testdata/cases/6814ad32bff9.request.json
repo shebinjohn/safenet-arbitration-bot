@@ -1,0 +1,71 @@
+{
+  "id": "0x6814ad32bff9ca46b2f163901199b9e215a83a790f864f7b6626f12a1feb5650",
+  "oracle": "0x4f61b8832978e83b80d69551aef07557dbe41d03",
+  "charter": "charter.safenet-gov.eth",
+  "feeToken": {
+    "address": "0x2a22f9c3b484c3629090feed35f17ff8f88f76f0",
+    "symbol": "USDC.e",
+    "decimals": 6
+  },
+  "state": "FROZEN",
+  "terms": {
+    "sponsor": "0x1f992a6d25be601af531f6f762afee8cc479c38c",
+    "bond": 800000000,
+    "slashAmount": 400000,
+    "daoFeeShare": 0,
+    "commitDeadline": 49342827,
+    "revealDeadline": 49342833
+  },
+  "fee": 400000,
+  "proposal": {
+    "consensus": "0xc855761d619f6002923507ce68b84d7689c2aa96",
+    "block": 49342821,
+    "time": "2026-11-18T12:06:25Z",
+    "ethereumBlock": 26441835,
+    "safeBlock": 26441835,
+    "txHash": "0x8a7f3e59cca2dba4da1873a2bae9abe2131d76c6c31a55d1b3aa0faf9051fccb",
+    "epoch": 34265,
+    "oracleData": "0x",
+    "safeTxHash": "0x0faf83ba200861840f4928baf7ffc59e9bc53a0bf70217bf4acdc33d48fe27f4",
+    "transaction": {
+      "chainId": 1,
+      "safe": "0xa422a5575a875bd0a6009b8cd820666ab39cef00",
+      "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "value": 0,
+      "data": "0xa9059cbb000000000000000000000000316473f1e8bcd1549527d07a9b68b545f0d2976e000000000000000000000000000000000000000000000000000000001049b0f5",
+      "operation": "CALL",
+      "safeTxGas": 0,
+      "baseGas": 0,
+      "gasPrice": 0,
+      "gasToken": "0x0000000000000000000000000000000000000000",
+      "refundReceiver": "0x0000000000000000000000000000000000000000",
+      "nonce": 3
+    }
+  },
+  "votes": [
+    {
+      "sentinel": "0xc84a0928632382e75c543acced101b9525027362",
+      "bond": 800000000,
+      "vote": "APPROVED",
+      "reason": "",
+      "rules": []
+    },
+    {
+      "sentinel": "0x6d081448c04d9ef7cf8ecf54207b1931ecc25312",
+      "bond": 800000000,
+      "vote": "DENIED",
+      "reason": "R-4.3",
+      "rules": [
+        "R-4.3"
+      ]
+    }
+  ],
+  "disputedRules": [
+    "R-4.3"
+  ],
+  "arbitration": {
+    "frozenBlock": 49342828,
+    "deadline": 49826668,
+    "outcome": "pending"
+  }
+}

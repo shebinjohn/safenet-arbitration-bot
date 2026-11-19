@@ -1,25 +1,18 @@
 package status
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/config"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
-	"github.com/safe-research/safenet-arbitration-bot/internal/httpretry"
+	"github.com/safe-research/safenet-arbitration-bot/internal/replay"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
 	"github.com/safe-research/safenet-arbitration-bot/internal/txservice"
 )
@@ -29,47 +22,16 @@ var (
 	recordConfig = flag.String("record-config", "", "with -record, the arbot configuration file with the RPC URLs of Ethereum Mainnet and Gnosis Chain to record from")
 )
 
-// recording is what a fixture recorded: the JSON-RPC exchanges with each
-// chain's node, by chain ID, and the replies of the Safe Transaction Service,
-// by path.
+// newFixture returns a fixture that serves the recording in the file at path,
+// or records it with -record.
 //
 // The exchanges were recorded by running Check, with the request's Progress and
 // Proposals, against live nodes and Safe's public service, through proxies that
-// keep every request and its answer. Run TestFixtures with -record and
+// keep every request and its answer (replay). Run TestFixtures with -record and
 // -record-config to record them again, which moves their latest blocks.
-type recording struct {
-	RPC     map[string][]exchange      `json:"rpc"`
-	Service map[string]json.RawMessage `json:"service"`
-}
-
-// exchange is a JSON-RPC request and its answer: a result or an error, or, for
-// an answer with another HTTP status than 200, the status and the body, such as
-// for a block range that the node won't scan.
-type exchange struct {
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  json.RawMessage `json:"error,omitempty"`
-	Status int             `json:"status,omitempty"`
-	Body   string          `json:"body,omitempty"`
-}
-
-// fixture serves a recording, or records one, for a test.
-type fixture struct {
-	t   *testing.T
-	cfg config.Config
-
-	mu  sync.Mutex
-	rec recording
-	// served counts the exchanges served by chain and key, so that a request that
-	// was made more than once, such as for the latest block, gets its answers in
-	// the order recorded.
-	served map[string]int
-}
-
-func newFixture(t *testing.T, path string) *fixture {
+func newFixture(t *testing.T, path string) *replay.Fixture {
 	t.Helper()
-	f := &fixture{t: t, rec: recording{RPC: map[string][]exchange{}, Service: map[string]json.RawMessage{}}, served: map[string]int{}}
+	opts := replay.Options{Record: *record, TrimReply: trimService}
 	if *record {
 		if *recordConfig == "" {
 			t.Fatal("-record needs -record-config")
@@ -78,166 +40,9 @@ func newFixture(t *testing.T, path string) *fixture {
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.cfg = cfg
-		t.Cleanup(func() { f.save(path) })
-		return f
+		opts.RPCs = cfg.RPCs
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, &f.rec); err != nil {
-		t.Fatalf("decoding %s: %v", path, err)
-	}
-	return f
-}
-
-// save writes the recording to path, formatted as jq formats it.
-func (f *fixture) save(path string) {
-	if f.t.Failed() {
-		return
-	}
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetIndent("", "  ")
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(f.rec); err != nil {
-		f.t.Fatal(err)
-	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		f.t.Fatal(err)
-	}
-}
-
-// key identifies a request by its method and parameters.
-func key(chain, method string, params json.RawMessage) string {
-	var compact bytes.Buffer
-	json.Compact(&compact, params)
-	return chain + " " + method + " " + compact.String()
-}
-
-// node returns a client for a node of the chain with the ID chainID that serves
-// the recording, or records it from the live node.
-func (f *fixture) node(chainID uint64) *ethrpc.Client {
-	f.t.Helper()
-	chain := strconv.FormatUint(chainID, 10)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			ID     uint64          `json:"id"`
-			Method string          `json:"method"`
-			Params json.RawMessage `json:"params"`
-		}
-		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &req)
-		res := map[string]any{"jsonrpc": "2.0", "id": req.ID}
-		if req.Method == "eth_chainId" {
-			res["result"] = ethrpc.Quantity(chainID)
-			json.NewEncoder(w).Encode(res)
-			return
-		}
-		x, err := f.exchange(chain, req.Method, req.Params, body)
-		if err != nil {
-			f.t.Errorf("chain %s: %s %s: %v", chain, req.Method, req.Params, err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		switch {
-		case x.Status != 0:
-			w.WriteHeader(x.Status)
-			io.WriteString(w, x.Body)
-			return
-		case x.Error != nil:
-			res["error"] = x.Error
-		default:
-			res["result"] = x.Result
-		}
-		json.NewEncoder(w).Encode(res)
-	}))
-	f.t.Cleanup(server.Close)
-	client, err := ethrpc.NewClient(f.t.Context(), chainID, server.URL)
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	return client
-}
-
-// exchange returns the answer to a request: the next one recorded, or, when
-// recording, the live node's.
-func (f *fixture) exchange(chain, method string, params json.RawMessage, body []byte) (exchange, error) {
-	k := key(chain, method, params)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if !*record {
-		var matches []exchange
-		for _, x := range f.rec.RPC[chain] {
-			if key(chain, x.Method, x.Params) == k {
-				matches = append(matches, x)
-			}
-		}
-		if len(matches) == 0 {
-			return exchange{}, fmt.Errorf("not recorded")
-		}
-		i := min(f.served[k], len(matches)-1)
-		f.served[k]++
-		return matches[i], nil
-	}
-
-	id, _ := strconv.ParseUint(chain, 10, 64)
-	resp, err := httpretry.Client.Post(f.cfg.RPCs[id], "application/json", bytes.NewReader(body))
-	if err != nil {
-		return exchange{}, err
-	}
-	defer resp.Body.Close()
-	answerBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return exchange{}, err
-	}
-	x := exchange{Method: method, Params: params}
-	switch {
-	case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500:
-		// A failure that says nothing about the chain isn't recorded: record again.
-		return exchange{}, fmt.Errorf("HTTP %s", resp.Status)
-	case resp.StatusCode != http.StatusOK:
-		x.Status, x.Body = resp.StatusCode, string(answerBody)
-	default:
-		var answer struct {
-			Result json.RawMessage `json:"result"`
-			Error  json.RawMessage `json:"error"`
-		}
-		if err := json.Unmarshal(answerBody, &answer); err != nil {
-			return exchange{}, err
-		}
-		x.Result, x.Error = trim(method, answer.Result), answer.Error
-	}
-	f.rec.RPC[chain] = append(f.rec.RPC[chain], x)
-	return x, nil
-}
-
-// trim returns the result of a method with only the fields that arbot reads,
-// which keeps the recordings small: the number, hash, and timestamp of a block,
-// and the hash, sender, recipient, and input of a transaction.
-func trim(method string, result json.RawMessage) json.RawMessage {
-	var fields []string
-	switch method {
-	case "eth_getBlockByNumber":
-		fields = []string{"number", "hash", "timestamp"}
-	case "eth_getTransactionByHash":
-		fields = []string{"hash", "from", "to", "input"}
-	default:
-		return result
-	}
-	var full map[string]json.RawMessage
-	if json.Unmarshal(result, &full) != nil || full == nil {
-		return result
-	}
-	kept := make(map[string]json.RawMessage)
-	for _, field := range fields {
-		if v, ok := full[field]; ok {
-			kept[field] = v
-		}
-	}
-	trimmed, _ := json.Marshal(kept)
-	return trimmed
+	return replay.Open(t, path, opts)
 }
 
 // serviceFields are the fields of a multisig transaction of the Safe
@@ -249,49 +54,16 @@ var serviceFields = []string{
 	"safeTxHash", "transactionHash", "blockNumber", "isExecuted", "isSuccessful",
 }
 
-// service returns a client for a Safe Transaction Service of Ethereum Mainnet
-// that serves the recording, or records it from Safe's public service.
-func (f *fixture) service() *txservice.Client {
-	f.t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		if !*record {
-			reply, ok := f.rec.Service[r.URL.Path]
-			if !ok {
-				http.NotFound(w, r)
-				return
-			}
-			w.Write(reply)
-			return
-		}
-		resp, err := httpretry.Client.Get(txservice.DefaultURLs[ethrpc.Mainnet] + r.URL.Path)
-		if err != nil {
-			f.t.Errorf("service: %v", err)
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode == http.StatusOK {
-			var full map[string]json.RawMessage
-			if err := json.Unmarshal(body, &full); err != nil {
-				f.t.Errorf("service: %v", err)
-			}
-			kept := make(map[string]json.RawMessage)
-			for _, field := range serviceFields {
-				if v, ok := full[field]; ok {
-					kept[field] = v
-				}
-			}
-			body, _ = json.Marshal(kept)
-			f.rec.Service[r.URL.Path] = body
-		}
-		w.WriteHeader(resp.StatusCode)
-		w.Write(body)
-	}))
-	f.t.Cleanup(server.Close)
-	return txservice.NewClient(server.URL, ethrpc.Mainnet)
+// trimService keeps the serviceFields of a reply of the service.
+func trimService(_, _ string, body json.RawMessage) json.RawMessage {
+	return replay.Fields(body, serviceFields...)
+}
+
+// recordedService returns a client for a Safe Transaction Service of Ethereum
+// Mainnet that serves the recording of f, or records it from Safe's public
+// service.
+func recordedService(f *replay.Fixture) *txservice.Client {
+	return txservice.NewClient(f.ServiceURL("txservice", txservice.DefaultURLs[ethrpc.Mainnet]), ethrpc.Mainnet)
 }
 
 // TestFixtures checks Check against requests whose Safe transactions were
@@ -358,7 +130,7 @@ func TestFixtures(t *testing.T) {
 			if err := json.Unmarshal(data, &r); err != nil {
 				t.Fatal(err)
 			}
-			gnosis, mainnet := f.node(ethrpc.Gnosis), f.node(ethrpc.Mainnet)
+			gnosis, mainnet := f.Node(ethrpc.Gnosis), f.Node(ethrpc.Mainnet)
 			sn := safenet.New(func(context.Context, uint64) (*ethrpc.Client, error) { return gnosis, nil }, safenet.DefaultOracle, safenet.DefaultConsensus)
 			p, err := sn.Progress(t.Context(), r.ID)
 			if err != nil {
@@ -371,7 +143,7 @@ func TestFixtures(t *testing.T) {
 				}
 			}
 			if test.withService {
-				c.Service = f.service()
+				c.Service = recordedService(f)
 			}
 			report, err := c.Check(t.Context(), &r, p)
 			if err != nil {

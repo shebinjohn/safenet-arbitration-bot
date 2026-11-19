@@ -193,6 +193,12 @@ func (f *Finder) readNonce(ctx context.Context, safe ethrpc.Address, block ethrp
 	if err != nil {
 		return nil, fmt.Errorf("reading the nonce of %s at block %d: %w", safe, block, err)
 	}
+	// A call to an account without code returns no data, which would fail to decode
+	// with an error that doesn't say why, such as for the account of an EOA
+	// transaction that a Sentinel test vector recasts as a Safe's.
+	if len(result) == 0 {
+		return nil, fmt.Errorf("reading the nonce of %s at block %d: the call returned no data, as a call to an account without code does, so it isn't a Safe", safe, block)
+	}
 	d := solabi.NewDecoder(result)
 	nonce := d.Uint(0)
 	if err := d.Err(); err != nil {

@@ -23,8 +23,13 @@ var offNetwork = check{
 	rule:        "R-4.0",
 	description: "Safe on a network that the Charter doesn't cover",
 	fn: func(_ context.Context, _ *env, safe *safeID, _ call) (bool, error) {
-		return !slices.ContainsFunc(networks, func(n uint64) bool {
-			return safe.chainID.IsUint64() && safe.chainID.Uint64() == n
-		}), nil
+		return !safe.chainID.IsUint64() || !Covered(safe.chainID.Uint64()), nil
 	},
+}
+
+// Covered reports whether the Charter's transaction-security rules other than
+// R-4.0 apply on the network with the ID chainID, which Article I lists. On any
+// other network, R-4.0 finds every transaction insecure.
+func Covered(chainID uint64) bool {
+	return slices.Contains(networks, chainID)
 }

@@ -46,6 +46,7 @@ var commands = map[string]struct {
 	"signatures":      {signaturesCommand, "list the functions of a contract on the Safe's chain of a Safenet request"},
 	"tags":            {tags, "list the tags of a ruling in the rulings corpus"},
 	"transfers":       {transfers, "list the transfers out of, or into, the Safe of a Safenet request"},
+	"vector":          {vectorCommand, "make a request of a Sentinel test vector, for the commands that take -request-file"},
 }
 
 // usageError is an error in the command-line arguments, for which arbot exits

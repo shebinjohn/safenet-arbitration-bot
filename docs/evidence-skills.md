@@ -12,69 +12,69 @@ The evidence skills let an arbitration collect its evidence with `arbot` alone, 
 
 Every command reads the Safe's chain as of the request's `safeBlock`, the last block before the proposal, since evidence must not include the transaction's own effects or anything later (§ 2.8, § 3.6). Each labels its facts as onchain, with their block, or offchain, with the service's URL and observation time (§ 3.4).
 
-### Node failures (PR 1)
+### Node failures
 
 - **What:** a request to a node that fails rather than being answered, such as for a rate limit (HTTP 429, or the JSON-RPC codes `-32005`, `-32016`, `-32029`), a server error, or a dropped connection, is a failure, not an answer (`ethrpc.Transient`). Every command fails on it, and says to run it again later or with another RPC URL.
 - **Why:** a rate limit or a pruned node was read as "no receipt" or "no code", which rejected executions that had happened (`2a00c4f75bcf`, `edc790eff7b7`, `5f5ff7ee811e`).
 - **Limits:** a node that answers wrongly, rather than failing, isn't detected. A pruned node's "missing trie node" is an error, not a transient failure, so the command fails without the hint.
 
-### `arbot executions -all [-calls [-abi]]` (PR 2)
+### `arbot executions -all [-calls [-abi]]`
 
 - **Inputs:** the request file.
 - **Output:** every Safe transaction that the Safe executed up to `safeBlock`, from the Safe Transaction Service, each confirmed onchain by its hash and the Safe's execution log, with its block time; whether the history is `complete` (every nonce below the Safe's nonce accounted for), the `missingNonces`, the scans of the block gaps, the executions that the chain `rejected`, the Safe's `creation`, and the request's own execution, if it ran by `safeBlock`, apart from the others (§ 3.6). With `-calls`, each transaction's calls, decoded as `arbot calls` decodes them, and with `-abi`, with the ABIs that Sourcify verified.
 - **Limits:** executions by modules use no nonce, so a complete history says nothing about them. It needs the service, an offchain source, and fails without one.
 - **Charter:** § 2.4 (the Safe's established pattern), § 2.9, § 3.4, § 3.6.
 
-### `arbot transfers -all [-in] [-to | -from <address>]` (PR 2)
+### `arbot transfers -all [-in] [-to | -from <address>]`
 
 - **Inputs:** the request file, and a counterparty to filter on.
 - **Output:** the ERC-20 transfers out of the Safe, or with `-in`, the ERC-20 and native transfers into it, over its whole life, read from the logs of the blocks that the service names, with the transfers that the service lists but the logs don't have, as `unmatched`.
 - **Limits:** native transfers out of the Safe and ERC-721 transfers aren't listed, nor native currency received without a `SafeReceived` event, such as before the Safe's address had code; the list is only as complete as the service's index. Any contract can log a `Transfer` event, so the token matters.
 - **Charter:** § 2.4, R-4.3, R-4.4.
 
-### `arbot account [-block N] [-spender <address>] <address>` (PR 3)
+### `arbot account [-block N] [-spender <address>] <address>`
 
 - **Inputs:** the request file and any address, such as a recipient, a token, or a created contract.
 - **Output:** its code hash and size, its § 2.1 identification, its native balance and nonce, and for a contract that answers as an ERC-20 token, the name, symbol, decimals, and total supply that it claims, and the Safe's balance and allowance to the spender.
 - **Limits:** a token's name is what the contract claims, not what it is. It doesn't show who controls an account or its history with others.
 - **Charter:** § 2.4, § 2.5, R-4.3 to R-4.6.
 
-### `arbot safe -address <address> | -at N | -compare <address>` (PR 3)
+### `arbot safe -address <address> | -at N | -compare <address>`
 
 - **Inputs:** the request file, and another account, or an earlier block.
 - **Output:** the settings of any Safe of a § 2.1 version, read from storage: singleton, owners, threshold, nonce, modules, fallback handler, guard, and module guard, or `null` with the reason (`no-code`, `not-a-safe-proxy`, `unknown-singleton`); with `-compare`, the settings of two Safes, or of one Safe at two blocks, field by field, with the owners and modules that they share.
 - **Limits:** shared owners are a fact about who controls two Safes, not evidence that a recipient is inside the expected target set (the ruling on `0x8b83aa12…`). A non-standard singleton's storage isn't decoded.
 - **Charter:** § 2.1, § 2.4, § 2.10, R-4.0, R-4.1, R-4.3.
 
-### `arbot calls -abi`, and the contracts that calls create (PR 4)
+### `arbot calls -abi`, and the contracts that calls create
 
 - **Inputs:** the request file.
 - **Output:** each call's function and arguments, decoded with the ABI that Sourcify verified when they aren't a well-known function (offchain, with its URL and observation time), and for each call to a § 2.1 CreateCall, the address of the contract that it deploys, derived from its data (`creates`, labelled `derived`, with its inputs).
 - **Limits:** an unverified account isn't decoded. A derived CREATE address assumes the transaction runs on the state at `safeBlock`, and a deployment by another contract isn't derived.
 - **Charter:** R-4.2, R-4.6 (created targets, [Charter issue #28](https://github.com/safe-research/safenet-charter/issues/28)).
 
-### `arbot simulate -all [-trace]` (PR 4)
+### `arbot simulate -all [-trace]`
 
 - **Inputs:** the request file.
 - **Output:** the whole Safe transaction run in order in the Safe's context at `safeBlock`, with `simulateAndRevert`, so that each call of a batch runs on the effects of those before it; its result, and its revert error, decoded as `Error`, `Panic`, or an error of the verified ABI, such as `DeploymentFailed()`; and with `-trace`, every nested call and every `CREATE` and `CREATE2` frame, with the created address, creator, and init code hash.
 - **Limits:** it runs on the state at `safeBlock`, not that of a later execution; the trace needs a node that serves `debug_traceCall`, or it says `trace unavailable`; the code that a creation deploys is reported, not judged. Reverting transactions ([#22](https://github.com/safe-research/safenet-charter/issues/22)) and malformed batches ([#26](https://github.com/safe-research/safenet-charter/issues/26)) are reported as facts, not classified.
 - **Charter:** § 2.8, R-4.2, R-4.6.
 
-### Block times and `arbot status` (PR 5)
+### Block times and `arbot status`
 
 - **Inputs:** the request file.
 - **Output:** `info`, `executions`, `transfers`, and `events` report each block's time. `status` reports the transaction's nonce against the Safe's, with `stale` for a nonce that the Safe had used by the proposal ([#20](https://github.com/safe-research/safenet-charter/issues/20)); whether and when the transaction was executed, confirmed onchain; the execution's timing against the proposal, the deadlines, the freeze, and the ruling, such as `before-proposal` ([#27](https://github.com/safe-research/safenet-charter/issues/27)) or `during-voting`; and the other proposals of the Safe's queue ([#19](https://github.com/safe-research/safenet-charter/issues/19)).
 - **Limits:** these are facts about the proposal, not evidence of its effects (§ 3.6), and it never classifies a request by them. It needs the oracle request, so it doesn't run on a test vector.
 - **Charter:** § 2.12, § 3.6.
 
-### The evidence summary and `arbot check-report` (PR 6)
+### The evidence summary and `arbot check-report`
 
 - **Inputs:** an arbitration directory: `report.md`, `request.json`, and the files that the draft was made from, such as `evidence.md`, `evidence-summary.json`, and the cases.
 - **Output:** every address, hash, hex value, number, time, abbreviation, quotation of the Charter, and cited precedent of the draft that isn't in a source, as an error; and of `evidence-summary.json`, the fields that the `evidence` skill defines that it lacks, a fact without its source kind, block, or offchain URL and observation time, and a summary whose uncertainty is high or whose decisive gap is open without `humanReview`, or whose draft doesn't say "Human review: required".
 - **Limits:** it checks that a value is in a source, not that it is the right value in its place.
 - **Charter:** § 2.7, § 3.4, § 5.2.
 
-### `arbot vector` (PR 7)
+### `arbot vector`
 
 - **Inputs:** a spec file of the [Sentinel test vectors](https://github.com/safe-research/sentinel-test-vectors).
 - **Output:** a request file in the shape of `arbot info -json`, with the vector's transaction, its block as `safeBlock`, and its rule as the disputed rule, marked with `"vector": {"path", "verdict", "rule", "eoa"}`, so that `classify` and every `-request-file` command run on the vector.
@@ -107,9 +107,9 @@ Validation is deterministic: no agent, and no model, runs in it. The fixture tes
 | `998b9630ee77` | R-4.3, secure | `internal/cli` `TestCase998b9630ee77` | `transfers -all -to` finds the 8 transfers to `0x123593c1b9b8872fafec7e67baec842258344306`, in USDT and USDC, which the service lists too; `executions -all` finds the Safe's 122 executions, complete up to nonce 122, and those that pay the recipient are in the blocks of those transfers. The fixture keeps the service's transfers to and from the recipient, of the 484 that it lists, since those are the ones that `transfers -all -to` reads the blocks of, and every execution. |
 | `6814ad32bff9` | R-4.3, insecure | `internal/cli` `TestCase6814ad32bff9` | No transfer between the Safe and `0x316473f1E8bCD1549527d07A9B68B545f0D2976e`, in either direction, over the Safe's whole life, and no execution that involves it, in a complete history; `safe -address` reads the recipient's settings: 3 owners and a threshold of 2. |
 | `cbfadf6b9595` | R-4.6, no accepted case | `internal/cli` `TestCasecbfadf6b9595HumanReview` | The three contracts that the transaction creates, from the trace of its simulation (`internal/simulate` `TestParseTrace`), and its execution during the voting, from its status (`internal/status` `TestFixtures`, whose recording it replays), in an evidence summary with the decisive gap of the public security flags. `internal/reportcheck`'s summary validation rejects it without `humanReview`, and `arbot check-report` rejects a draft of it that doesn't say "Human review: required": this is the check that ambiguous cases go to human review. |
-| `a049284bbb54` | R-4.3, insecure | `internal/status` `TestFixtures`, `internal/cli` `TestCheckReport` | Executed 2 seconds before its proposal, with a nonce that the Safe had used (PR 5); its saved report passes `arbot check-report`, and one with a planted hash fails (PR 6). |
+| `a049284bbb54` | R-4.3, insecure | `internal/status` `TestFixtures`, `internal/cli` `TestCheckReport` | Executed 2 seconds before its proposal, with a nonce that the Safe had used; its saved report passes `arbot check-report`, and one with a planted hash fails. |
 
-Other tests pin the evidence of these cases too: `internal/create` and `internal/checks` the CREATE and CREATE2 addresses of `cbfadf6b9595`'s nonce 24 (PR 4), `internal/simulate` its `simulateAndRevert` result and `DeploymentFailed()` error, and `internal/cli` `TestMentionedCommandsExist` that every command and flag that the skills mention exists. `internal/playbooks` `TestLoad` checks that the vector harness can read every playbook.
+Other tests pin the evidence of these cases too: `internal/create` and `internal/checks` the CREATE and CREATE2 addresses of `cbfadf6b9595`'s nonce 24, `internal/simulate` its `simulateAndRevert` result and `DeploymentFailed()` error, and `internal/cli` `TestMentionedCommandsExist` that every command and flag that the skills mention exists. `internal/playbooks` `TestLoad` checks that the vector harness can read every playbook.
 
 To record a fixture again, run its test with `-record -record-config <config>`, with a configuration file whose Ethereum Mainnet RPC URL is an archive node, such as `go test ./internal/cli -run TestCase -record -record-config arbot.config.json`.
 

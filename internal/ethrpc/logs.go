@@ -9,7 +9,7 @@ import (
 // Nodes commonly limit the block range of eth_getLogs, often to 10,000 blocks,
 // and only report the limit in an error message, whose format varies. ScanLogs
 // starts with chunks of maxLogRange blocks, and halves them down to minLogRange
-// blocks while the node answers with JSON-RPC errors.
+// blocks while the node answers with JSON-RPC errors that aren't transient.
 var (
 	maxLogRange uint64 = 10_000
 	minLogRange uint64 = 50
@@ -26,7 +26,9 @@ func (c *Client) ScanLogs(ctx context.Context, filter LogFilter) iter.Seq2[Log, 
 			chunk.FromBlock = from
 			chunk.ToBlock = min(from+BlockNumber(step-1), filter.ToBlock)
 			logs, err := c.GetLogs(ctx, chunk)
-			if _, ok := errors.AsType[*Error](err); ok && step > minLogRange {
+			// A rate limit or a server error is not about the range, and a smaller range
+			// only means more requests.
+			if _, ok := errors.AsType[*Error](err); ok && !Transient(err) && step > minLogRange {
 				step = max(step/2, minLogRange)
 				continue
 			}

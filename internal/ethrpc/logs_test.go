@@ -123,3 +123,24 @@ func TestScanLogsStopsEarly(t *testing.T) {
 		t.Errorf("ranges: got %v, want only the first chunk", *ranges)
 	}
 }
+
+func TestScanLogsKeepsRangeOnRateLimit(t *testing.T) {
+	fastRateLimitRetries(t)
+	// A rate limit is not about the range, so the scan fails with it instead of
+	// halving the range down to the minimum, which only sends more requests.
+	var ranges int
+	url, _ := node(t, "0x1", func(w http.ResponseWriter, id uint64) {
+		ranges++
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": -32005, "message": "Rate limit exceeded"}})
+	})
+	client := connect(t, url)
+	client.http = http.DefaultClient // don't let httpretry wait on the 429s
+	var err error
+	for _, err = range client.ScanLogs(t.Context(), LogFilter{FromBlock: 0, ToBlock: 100_000}) {
+		break
+	}
+	if !Transient(err) || ranges != rateLimitRetries+1 {
+		t.Errorf("ScanLogs: got %v after %d requests, want a transient error after %d requests for one range", err, ranges, rateLimitRetries+1)
+	}
+}

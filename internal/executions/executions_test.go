@@ -34,6 +34,9 @@ type chain struct {
 	// traces are the callTracer results by transaction hash. A transaction without
 	// one fails to trace, like on a node that doesn't serve traces.
 	traces map[ethrpc.Hash]any
+	// failing are the methods that the node fails with HTTP status 500, as a node
+	// does that is overloaded.
+	failing []string
 }
 
 // serve starts the node, and returns a client for it.
@@ -47,6 +50,10 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if slices.Contains(c.failing, req.Method) {
+			http.Error(w, "overloaded", http.StatusInternalServerError)
 			return
 		}
 		res := map[string]any{"jsonrpc": "2.0", "id": req.ID}
@@ -376,6 +383,45 @@ func TestFindServiceFailure(t *testing.T) {
 	}
 	if !slices.ContainsFunc(warnings, func(w error) bool { return strings.Contains(w.Error(), "500") }) {
 		t.Errorf("warnings: got %v, want one with the HTTP status", warnings)
+	}
+}
+
+func TestFindNodeFailure(t *testing.T) {
+	// A node that fails rather than answers says nothing about the execution, so
+	// Find fails instead of reporting an unknown transaction.
+	tx := transaction("calldata", 1)
+	execLog := executionLog(executionSuccessEvent, tx.Hash(), hash(1), true, 100, 0)
+	for _, method := range []string{"eth_call", "eth_getTransactionByHash"} {
+		c := &chain{
+			logs:    []ethrpc.Log{execLog},
+			nonce:   big.NewInt(2),
+			txs:     map[ethrpc.Hash]ethrpc.Transaction{hash(1): {Hash: hash(1), To: &relayer, Input: execCall(tx)}},
+			failing: []string{method},
+		}
+		f := &Finder{Eth: c.serve(t)}
+		got, err := f.Find(t.Context(), safe, 0, 200)
+		if err == nil || !ethrpc.Transient(err) {
+			t.Errorf("%s failing: Find got %+v, %v, want a transient error", method, got, err)
+		}
+	}
+}
+
+func TestFindTraceServerError(t *testing.T) {
+	// Some nodes refuse debug_traceTransaction with a server error, which leaves
+	// the transaction unknown with a warning rather than failing.
+	tx := transaction("relayed", 1)
+	c := &chain{
+		logs:    []ethrpc.Log{executionLog(executionSuccessEvent, tx.Hash(), hash(1), true, 100, 0)},
+		nonce:   big.NewInt(2),
+		txs:     map[ethrpc.Hash]ethrpc.Transaction{hash(1): {Hash: hash(1), To: &relayer, Input: execCall(tx)}},
+		failing: []string{"debug_traceTransaction"},
+	}
+	f := &Finder{Eth: c.serve(t)}
+	var warnings []error
+	f.Warn = func(err error) { warnings = append(warnings, err) }
+	got, err := f.Find(t.Context(), safe, 0, 200)
+	if err != nil || len(got) != 1 || got[0].Transaction != nil || len(warnings) != 1 {
+		t.Errorf("Find: got %+v, %v, warnings %v; want an unknown transaction with one warning", got, err, warnings)
 	}
 }
 

@@ -126,7 +126,10 @@ func (f *Finder) Find(ctx context.Context, safe ethrpc.Address, from, to ethrpc.
 	d := &decoder{Finder: f, safe: safe, to: to, executions: executions, events: events}
 	for i := range executions {
 		e := &executions[i]
-		e.Source, e.Transaction = d.decode(ctx, i)
+		var err error
+		if e.Source, e.Transaction, err = d.decode(ctx, i); err != nil {
+			return nil, err
+		}
 	}
 	return executions, nil
 }

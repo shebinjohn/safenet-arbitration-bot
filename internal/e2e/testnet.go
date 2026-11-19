@@ -266,6 +266,15 @@ func (n *Testnet) Propose(oracleData []byte) *Request {
 	return n.proposed(n.Transact(n.Sponsor, n.Artifacts.Consensus, n.proposal(tx, oracleData)), tx, oracleData)
 }
 
+// ProposeTransaction proposes a new Safe transaction, as Propose does, with the
+// fields that modify sets, and no oracle data.
+func (n *Testnet) ProposeTransaction(modify func(tx *safenet.SafeTransaction)) *Request {
+	n.tb.Helper()
+	tx := n.transaction()
+	modify(tx)
+	return n.proposed(n.Transact(n.Sponsor, n.Artifacts.Consensus, n.proposal(tx, nil)), tx, nil)
+}
+
 // ProposeInOneBlock proposes a new Safe transaction for each of the oracle
 // data, all in the same block.
 func (n *Testnet) ProposeInOneBlock(oracleData ...[]byte) []*Request {

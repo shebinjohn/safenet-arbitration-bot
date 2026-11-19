@@ -11,6 +11,7 @@ import (
 	"github.com/safe-research/safenet-arbitration-bot/internal/checks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/executions"
+	"github.com/safe-research/safenet-arbitration-bot/internal/simulate"
 )
 
 // executionsReport is the JSON output of `arbot executions`.
@@ -80,6 +81,7 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	requestFile := flags.String("request-file", "", "read the Safe, its chain, and the block from the request in the JSON file at `path`, as written by arbot info -json")
 	blocks := flags.Uint64("blocks", defaultScanBlocks, "search this number of blocks up to the request's Safe block")
 	withCalls := flags.Bool("calls", false, "also list the calls that each transaction makes, as arbot calls lists them")
+	withABI := flags.Bool("abi", false, "with -calls, also decode each call that isn't a well-known function with the ABI that Sourcify verified, as arbot calls -abi does")
 	all := flags.Bool("all", false, "list every execution up to the request's Safe block, found with the Safe Transaction Service, instead of searching the last -blocks blocks")
 	flags.Usage = func() {
 		out := flags.Output()
@@ -104,7 +106,11 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 		fmt.Fprintf(out, "calls to MultiSend contracts decoded into their calls, and each call's data decoded as a well-known\n")
 		fmt.Fprintf(out, "function, if it is one, such as an ERC-20 transfer, or a Safe's execTransaction and the call it makes.\n")
 		fmt.Fprintf(out, "The refund call is the largest refund that a transaction allows, and the payment is what it paid. The\n")
-		fmt.Fprintf(out, "calls of a failed execution had no effect.\n\n")
+		fmt.Fprintf(out, "calls of a failed execution had no effect. A call to a CreateCall of a § 2.1 version has the address of\n")
+		fmt.Fprintf(out, "the contract that it deploys with CREATE2, as arbot calls has it, but not with CREATE, since that\n")
+		fmt.Fprintf(out, "depends on the deployer's nonce when the transaction was executed, not at the Safe block. With -abi,\n")
+		fmt.Fprintf(out, "each call that isn't a well-known function is also decoded with the ABI that Sourcify verified for\n")
+		fmt.Fprintf(out, "the account as of the Safe block, as arbot calls -abi decodes it.\n\n")
 		fmt.Fprintf(out, "With -all, it lists every execution up to the request's Safe block instead, which a scan of the\n")
 		fmt.Fprintf(out, "Safe's logs can't reach on public nodes. It needs the Safe Transaction Service, an offchain source\n")
 		fmt.Fprintf(out, "that it reports with its URL and when it was observed, and lists the Safe's executed transactions\n")
@@ -133,6 +139,9 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	flags.Visit(func(f *flag.Flag) { blocksSet = blocksSet || f.Name == "blocks" })
 	if *all && blocksSet {
 		return usageError("-blocks doesn't apply with -all, which searches every block")
+	}
+	if *withABI && !*withCalls {
+		return usageError("-abi only applies with -calls")
 	}
 	var ref *safeRef
 	var fromBlock uint64
@@ -190,8 +199,12 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 	}
 	report.Executions = make([]execution, len(found))
 	var reader *checks.CallReader
+	var decoder *simulate.ABIDecoder
 	if *withCalls {
 		reader = checks.NewCallReader(ref.eth, ref.Safe, ethrpc.BlockNumber(ref.SafeBlock))
+		if *withABI {
+			decoder = abiDecoder(e, reader)
+		}
 	}
 	withCallsOf := func(x executions.Execution) (execution, error) {
 		item := execution{Execution: x}
@@ -201,6 +214,11 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 		calls, err := reader.Calls(ctx, x.Transaction)
 		if err != nil {
 			return item, fmt.Errorf("decoding the calls of Safe transaction %s: %w", x.SafeTxHash, err)
+		}
+		if decoder != nil {
+			if err := decoder.Decode(ctx, calls.Calls); err != nil {
+				return item, fmt.Errorf("decoding the calls of Safe transaction %s with Sourcify: %w", x.SafeTxHash, err)
+			}
 		}
 		item.Target, item.Calls = &calls.Target, calls.Calls
 		return item, nil

@@ -25,6 +25,8 @@ func TestSelectors(t *testing.T) {
 		"approve(address,uint256)":              "0x095ea7b3",
 		"execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)": "0x6a761202",
 		"createProxyWithNonce(address,bytes,uint256)":                                                "0x1688f0b9",
+		"performCreate(uint256,bytes)":                                                               "0x4c8c9ea1",
+		"performCreate2(uint256,bytes,bytes32)":                                                      "0x4847be6f",
 	} {
 		selector := solabi.Selector(signature)
 		if got := ethrpc.Bytes(selector[:]).String(); got != want {
@@ -93,6 +95,19 @@ func TestDecode(t *testing.T) {
 				`{"name":"singleton","type":"address","value":"0x41675c099f32341bf84bfc5382af534df5c7461a"},` +
 				`{"name":"initializer","type":"bytes","value":"0xba0bba40"},` +
 				`{"name":"saltNonce","type":"uint256","value":4}]}`,
+		},
+		{
+			"performCreate", solabi.Call(solabi.Selector("performCreate(uint256,bytes)"), big.NewInt(0), []byte{0x60, 0x00}),
+			`{"name":"performCreate","signature":"performCreate(uint256,bytes)","args":[` +
+				`{"name":"value","type":"uint256","value":0},` +
+				`{"name":"deploymentData","type":"bytes","value":"0x6000"}]}`,
+		},
+		{
+			"performCreate2", solabi.Call(solabi.Selector("performCreate2(uint256,bytes,bytes32)"), big.NewInt(1), []byte{0x60, 0x00}, ethrpc.Hash{31: 5}),
+			`{"name":"performCreate2","signature":"performCreate2(uint256,bytes,bytes32)","args":[` +
+				`{"name":"value","type":"uint256","value":1},` +
+				`{"name":"deploymentData","type":"bytes","value":"0x6000"},` +
+				`{"name":"salt","type":"bytes32","value":"0x0000000000000000000000000000000000000000000000000000000000000005"}]}`,
 		},
 	}
 	for _, test := range tests {

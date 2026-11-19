@@ -11,9 +11,11 @@ import (
 // writes it: a function, the fallback or receive function, a constructor, an
 // event, or an error.
 type ABIEntry struct {
-	Type            string     `json:"type"`
-	Name            string     `json:"name"`
-	Inputs          []ABIParam `json:"inputs"`
+	Type   string     `json:"type"`
+	Name   string     `json:"name"`
+	Inputs []ABIParam `json:"inputs"`
+	// Outputs are the values that a function returns.
+	Outputs         []ABIParam `json:"outputs"`
 	StateMutability string     `json:"stateMutability"`
 	// Payable and Constant are the state mutability of an entry of a compiler
 	// before Solidity 0.6, which has no StateMutability.
@@ -23,6 +25,8 @@ type ABIEntry struct {
 
 // ABIParam is a parameter of an ABIEntry.
 type ABIParam struct {
+	// Name is the parameter's name, which may be empty.
+	Name string `json:"name"`
 	// Type is the parameter's canonical type, such as "uint256" or "address[]",
 	// where a tuple is "tuple", with array suffixes if it is an array of tuples.
 	Type string `json:"type"`

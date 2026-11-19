@@ -15,12 +15,33 @@ const testBlock = 42
 
 var testSafe = ethrpc.Address{0: 0x5a, 19: 0xfe}
 
-// fakeNode serves the storage of testSafe at testBlock, and fails the test for
-// any other account or block.
+// fakeNode serves the code and storage of testSafe at testBlock, and those of
+// the other accounts, and fails the test for any other account or block.
 type fakeNode struct {
+	code    ethrpc.Bytes
 	storage map[ethrpc.Hash]ethrpc.Hash
+	// accounts are the other accounts that the node serves.
+	accounts map[ethrpc.Address]fakeAccount
 	// fail makes the node answer eth_getStorageAt with an error.
 	fail bool
+	// overloaded makes the node answer every request but eth_chainId with HTTP
+	// status 500, as an overloaded node does.
+	overloaded bool
+}
+
+// fakeAccount is the code and storage of an account.
+type fakeAccount struct {
+	code    ethrpc.Bytes
+	storage map[ethrpc.Hash]ethrpc.Hash
+}
+
+// account returns the account at address, and whether the node serves it.
+func (n *fakeNode) account(address ethrpc.Address) (fakeAccount, bool) {
+	if address == testSafe {
+		return fakeAccount{code: n.code, storage: n.storage}, true
+	}
+	a, ok := n.accounts[address]
+	return a, ok
 }
 
 func (n *fakeNode) client(t *testing.T) *ethrpc.Client {
@@ -36,22 +57,43 @@ func (n *fakeNode) client(t *testing.T) *ethrpc.Client {
 			return
 		}
 		reply := map[string]any{"jsonrpc": "2.0", "id": req.ID}
+		if n.overloaded && req.Method != "eth_chainId" {
+			http.Error(w, "overloaded", http.StatusInternalServerError)
+			return
+		}
 		switch req.Method {
 		case "eth_chainId":
 			reply["result"] = ethrpc.Quantity(ethrpc.Mainnet)
+		case "eth_getCode":
+			var address ethrpc.Address
+			var block ethrpc.BlockNumber
+			if len(req.Params) != 2 || json.Unmarshal(req.Params[0], &address) != nil || json.Unmarshal(req.Params[1], &block) != nil || block != testBlock {
+				t.Errorf("eth_getCode: got params %s, want an account at block %d", req.Params, testBlock)
+			}
+			account, ok := n.account(address)
+			if !ok {
+				t.Errorf("eth_getCode: got account %s, which the node doesn't serve", address)
+			}
+			if account.code == nil {
+				account.code = ethrpc.Bytes{}
+			}
+			reply["result"] = account.code
 		case "eth_getStorageAt":
 			var address ethrpc.Address
 			var slot ethrpc.Hash
 			var block ethrpc.BlockNumber
 			if len(req.Params) != 3 || json.Unmarshal(req.Params[0], &address) != nil ||
-				json.Unmarshal(req.Params[1], &slot) != nil || json.Unmarshal(req.Params[2], &block) != nil ||
-				address != testSafe || block != testBlock {
-				t.Errorf("eth_getStorageAt: got params %s, want %s at block %d", req.Params, testSafe, testBlock)
+				json.Unmarshal(req.Params[1], &slot) != nil || json.Unmarshal(req.Params[2], &block) != nil || block != testBlock {
+				t.Errorf("eth_getStorageAt: got params %s, want an account at block %d", req.Params, testBlock)
+			}
+			account, ok := n.account(address)
+			if !ok {
+				t.Errorf("eth_getStorageAt: got account %s, which the node doesn't serve", address)
 			}
 			if n.fail {
 				reply["error"] = map[string]any{"code": -32000, "message": "missing trie node"}
 			} else {
-				reply["result"] = n.storage[slot]
+				reply["result"] = account.storage[slot]
 			}
 		default:
 			t.Errorf("unexpected method %s", req.Method)

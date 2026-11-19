@@ -40,7 +40,8 @@ type transferJSON struct {
 
 // TestTransfers runs `arbot transfers` against the fee token and the native
 // currency on the Safe's chain, with transfers out of the Safe and into it,
-// before and after a proposal, and between other accounts.
+// before and after a proposal, and between other accounts, and `arbot account`
+// against the fee token and the accounts that sent it.
 func TestTransfers(t *testing.T) {
 	t.Parallel()
 	n := e2e.NewTestnet(t)
@@ -197,6 +198,72 @@ func TestTransfers(t *testing.T) {
 		}
 		if stderr := arbot.Fail(t, 1, "transfers", "-all", "-request-file", path); !strings.Contains(string(stderr), "-all needs the Safe Transaction Service of chain 1") {
 			t.Errorf("transfers -all without a service: got %q, want an error about the service", stderr)
+		}
+	})
+
+	t.Run("account", func(t *testing.T) {
+		type accountOutput struct {
+			ChainID   uint64          `json:"chainId"`
+			SafeBlock uint64          `json:"safeBlock"`
+			Block     uint64          `json:"block"`
+			Safe      ethrpc.Address  `json:"safe"`
+			Address   ethrpc.Address  `json:"address"`
+			CodeSize  int             `json:"codeSize"`
+			Self      bool            `json:"self"`
+			Contract  json.RawMessage `json:"contract"`
+			Balance   *big.Int        `json:"balance"`
+			Nonce     uint64          `json:"nonce"`
+			ERC20     *struct {
+				Symbol        string          `json:"symbol"`
+				Decimals      uint8           `json:"decimals"`
+				TotalSupply   *big.Int        `json:"totalSupply"`
+				SafeBalance   *big.Int        `json:"safeBalance"`
+				Spender       *ethrpc.Address `json:"spender"`
+				SafeAllowance *big.Int        `json:"safeAllowance"`
+			} `json:"erc20"`
+		}
+		// The fee token, of which the Safe has what alice sent it before the proposal,
+		// since it sent out all that it wrapped.
+		got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, token.String()))
+		if got.ChainID != ethrpc.Mainnet || got.SafeBlock != safeBlock || got.Block != safeBlock || got.Safe != safe || got.Address != token ||
+			got.CodeSize == 0 || got.Self || string(got.Contract) != "null" || got.ERC20 == nil ||
+			got.ERC20.Symbol == "" || got.ERC20.Decimals != 18 || got.ERC20.SafeBalance.Cmp(ether(6)) != 0 {
+			t.Errorf("account of the fee token: got %+v %+v, want a contract that is an ERC-20 token with 18 decimals, of which the Safe has %s", got, got.ERC20, ether(6))
+		}
+		// WETH9 returns a total supply. The Safe approved no one, so its allowance to
+		// alice is zero, which is shown. The last block before the Safe block is after
+		// alice's transfer to the Safe.
+		got = decode[accountOutput](t, arbot.Run(t, "account", "-json", "-block", fmt.Sprint(safeBlock-1), "-spender", alice.String(), "-request-file", path, token.String()))
+		if got.Block != safeBlock-1 || got.SafeBlock != safeBlock || got.ERC20 == nil || got.ERC20.TotalSupply == nil ||
+			got.ERC20.SafeBalance.Cmp(ether(6)) != 0 || got.ERC20.Spender == nil || *got.ERC20.Spender != alice ||
+			got.ERC20.SafeAllowance == nil || got.ERC20.SafeAllowance.Sign() != 0 {
+			t.Errorf("account -block -spender of the fee token: got %+v %+v, want block %d, a total supply, the Safe's balance %s, and a zero allowance to alice", got, got.ERC20, safeBlock-1, ether(6))
+		}
+		if stderr := arbot.Fail(t, 2, "account", "-block", fmt.Sprint(safeBlock+1), "-request-file", path, token.String()); !strings.Contains(string(stderr), "is after the request's Safe block") {
+			t.Errorf("account -block after the Safe block: got %q, want a usage error", stderr)
+		}
+		// Alice sent two transactions before the proposal, to wrap ether and send it.
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, alice.String())); got.CodeSize != 0 || got.Nonce != 2 || got.ERC20 != nil {
+			t.Errorf("account of alice: got %+v, want no code, nonce 2, and no token", got)
+		}
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, someone.String())); got.CodeSize != 0 || got.Nonce != 0 || got.Balance.Sign() != 0 || got.ERC20 != nil {
+			t.Errorf("account of an unused account: got %+v, want nothing", got)
+		}
+		if got := decode[accountOutput](t, arbot.Run(t, "account", "-json", "-request-file", path, safe.String())); !got.Self || got.CodeSize == 0 {
+			t.Errorf("account of the Safe: got %+v, want the Safe itself", got)
+		}
+
+		text := arbot.Run(t, "account", "-request-file", path, token.String())
+		for _, want := range []string{
+			fmt.Sprintf(`(?m)^Account %s on chain 1, as of block %d$`, token, safeBlock),
+			`(?m)^  Code +\d+ bytes, hash 0x[0-9a-f]{64}$`,
+			`(?m)^  Decimals +18$`,
+			`(?m)^  Total supply +\d+$`,
+			`(?m)^  Safe balance +` + ether(6).String() + `$`,
+		} {
+			if !regexp.MustCompile(want).Match(text) {
+				t.Errorf("account: output has no line matching %q:\n%s", want, text)
+			}
 		}
 	})
 

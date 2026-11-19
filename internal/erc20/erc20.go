@@ -1,4 +1,4 @@
-// Package erc20 reads ERC-20 token history from a chain's logs.
+// Package erc20 reads ERC-20 tokens, and their history from a chain's logs.
 package erc20
 
 import (

@@ -1,12 +1,16 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/checks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/simulate"
+	"github.com/safe-research/safenet-arbitration-bot/internal/sourcify"
 )
 
 // callsCommand lists the calls that the Safe of a request makes, as the
@@ -15,6 +19,7 @@ func callsCommand(ctx context.Context, e *env, args []string) error {
 	flags := e.flagSet("calls")
 	asJSON := flags.Bool("json", false, "write the calls as JSON")
 	requestFile := flags.String("request-file", "", "read the request from the JSON file at `path`, as written by arbot info -json")
+	withABI := flags.Bool("abi", false, "also decode each call that isn't a well-known function with the ABI that Sourcify verified")
 	flags.Usage = func() {
 		out := flags.Output()
 		fmt.Fprintf(out, "Usage: %s calls [flags] -request-file <path>\n\n", e.progname)
@@ -35,6 +40,13 @@ func callsCommand(ctx context.Context, e *env, args []string) error {
 		fmt.Fprintf(out, "and approve, the Safe's execTransaction, with the data of the call that it makes decoded the same way,\n")
 		fmt.Fprintf(out, "and the Safe proxy factories' createProxyWithNonce. Data is decoded by its selector and ABI layout only,\n")
 		fmt.Fprintf(out, "so what a call does depends on the account that it is to.\n\n")
+		fmt.Fprintf(out, "A call to the CreateCall contract of a § 2.1 version has the address of the contract that it would\n")
+		fmt.Fprintf(out, "deploy, derived from its data: with CREATE2, from the deployer, salt, and init code, and with\n")
+		fmt.Fprintf(out, "CREATE, from the deployer's nonce at the Safe block and the deployments of the calls before it. The\n")
+		fmt.Fprintf(out, "deployer is the CreateCall for a call, and the Safe for a delegate call.\n\n")
+		fmt.Fprintf(out, "With -abi, a call whose data isn't a well-known function is also decoded with the ABI that\n")
+		fmt.Fprintf(out, "Sourcify, an offchain source, verified for the account that it calls, which it reports with its URL\n")
+		fmt.Fprintf(out, "and observation time, looking up each account once. A call to an unverified account isn't decoded.\n\n")
 		flags.PrintDefaults()
 	}
 	if err := parse(flags, args, 0); err != nil {
@@ -47,9 +59,18 @@ func callsCommand(ctx context.Context, e *env, args []string) error {
 	if err != nil {
 		return err
 	}
-	report, err := checks.Calls(ctx, ethrpc.NewDialer(e.cfg.RPCs), request)
+	reader, err := checks.RequestReader(ctx, ethrpc.NewDialer(e.cfg.RPCs), request)
 	if err != nil {
 		return err
+	}
+	report, err := reader.Calls(ctx, &request.Proposal.Transaction)
+	if err != nil {
+		return err
+	}
+	if *withABI {
+		if err := abiDecoder(e, reader).Decode(ctx, report.Calls); err != nil {
+			return err
+		}
 	}
 
 	if *asJSON {
@@ -70,7 +91,46 @@ func callsCommand(ctx context.Context, e *env, args []string) error {
 		}
 		fmt.Fprintf(w, "%d\t%s\t%s\n", i+1, callText(c), data)
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	printCreations(e, report.Calls)
+	return nil
+}
+
+// abiDecoder returns a decoder of the calls that reader reads with the ABIs
+// that Sourcify verified.
+func abiDecoder(e *env, reader *checks.CallReader) *simulate.ABIDecoder {
+	repo := sourcify.NewClient(cmp.Or(e.cfg.Sourcify, sourcify.DefaultURL))
+	return simulate.NewABIDecoder(repo, reader, reader.Client().ChainID())
+}
+
+// printCreations lists the contracts that calls would deploy, and the inputs
+// that their addresses are derived from, if any.
+func printCreations(e *env, calls []checks.Call) {
+	var creations []string
+	for i, c := range calls {
+		if cr := c.Creates; cr != nil {
+			inputs := fmt.Sprintf("nonce %d", deref(cr.Nonce))
+			if cr.Salt != nil {
+				inputs = "salt " + cr.Salt.String()
+			}
+			creations = append(creations, fmt.Sprintf("  call %d  %s (derived, %s by %s, %s, init code hash %s)",
+				i+1, cr.Address, strings.ToUpper(cr.Method), cr.Deployer, inputs, cr.InitCodeHash))
+		}
+	}
+	if len(creations) > 0 {
+		fmt.Fprintf(e.stdout, "\nCreated contracts\n\n%s\n", strings.Join(creations, "\n"))
+	}
+}
+
+// deref returns the value that p points to, or zero for nil.
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }
 
 // callText describes a call in the KIND, TO, ACCOUNT, OPERATION, VALUE, and
@@ -81,8 +141,15 @@ func callText(c checks.Call) string {
 		kind += " (" + c.Placeholder + " placeholder)"
 	}
 	function := "-"
-	if c.Function != nil {
+	switch {
+	case c.Function != nil:
 		function = c.Function.String()
+	case c.ABI != nil && c.ABI.Function != nil:
+		function = c.ABI.Function.Signature + " (sourcify)"
+	case c.ABI != nil && c.ABI.Status == sourcify.Unverified:
+		function = "- (unverified)"
+	case c.ABI != nil && c.ABI.Status == sourcify.Verified:
+		function = "- (not in the ABI)"
 	}
 	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", kind, c.To.Address, accountText(c.To), c.Operation, c.Value, function)
 }

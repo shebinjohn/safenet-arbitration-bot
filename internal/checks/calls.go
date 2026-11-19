@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/functions"
@@ -55,7 +56,7 @@ type Account struct {
 }
 
 // Contract is a contract of a Safe version of § 2.1: MultiSend,
-// MultiSendCallOnly, or the Safe or SafeL2 singleton.
+// MultiSendCallOnly, CreateCall, or the Safe or SafeL2 singleton.
 type Contract struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -83,6 +84,38 @@ type Call struct {
 	// ABI layout only, if it is one. What the call does depends on the account that
 	// it is to.
 	Function *functions.Function `json:"function"`
+	// Creates is the contract that a call to a CreateCall of a § 2.1 version
+	// deploys, derived from its data, if the call is one, and left out otherwise.
+	Creates *Creation `json:"creates,omitempty"`
+	// ABI is the lookup of the account's ABI in Sourcify, for a call that
+	// simulate.ABIDecoder looked up, and left out otherwise. See ABILookup.
+	ABI *ABILookup `json:"abi,omitempty"`
+}
+
+// ABILookup is how a call's data decodes with the ABI that Sourcify, an
+// offchain source (§ 3.4), verified for the account that the call is to, as of
+// the account's code at the block.
+type ABILookup struct {
+	// Status is "verified" for an account whose contract Sourcify verified,
+	// "unverified" for one that it hasn't, whose call isn't decoded, and "no-code"
+	// for an account without code, which isn't looked up.
+	Status string `json:"status"`
+	// Source is "sourcify", and URL and ObservedAt are where and when the ABI was
+	// fetched, for an account with code.
+	Source     string     `json:"source"`
+	URL        string     `json:"url,omitempty"`
+	ObservedAt *time.Time `json:"observedAt,omitempty"`
+	// Function is the function of the ABI whose selector the data starts with, or
+	// nil if there is none, or the account isn't verified.
+	Function *ABIFunction `json:"function"`
+}
+
+// ABIFunction is a call's data decoded with a function of a verified ABI.
+type ABIFunction struct {
+	Signature string `json:"signature"`
+	// Inputs are the arguments, as arbot simulate decodes them, or nil if one has a
+	// type that isn't decoded or the data is malformed.
+	Inputs []functions.Arg `json:"inputs"`
 }
 
 // callKinds are the names of the kinds of calls, by callKind.
@@ -93,14 +126,28 @@ var callKinds = []string{Root: "root", Batched: "batched", Refund: "refund"}
 // 2.1 versions are decoded into the calls that they make, a call that reverts
 // whatever the state or makes no calls is replaced by a placeholder, and a
 // synthetic call pays the largest gas refund that the transaction allows, if
-// any. It reads the Safe and the accounts that it calls on the Safe's chain at
-// the proposal's SafeBlock, connecting with dial.
+// any. A call to a CreateCall of a § 2.1 version has the contract that it
+// deploys, with CREATE2 or CREATE (see CallReader.DeriveCreateNonces). It reads
+// the Safe and the accounts that it calls on the Safe's chain at the proposal's
+// SafeBlock, connecting with dial.
 //
 // Contracts are identified by their address, since the contracts of § 2.1
 // versions are deterministic deployments, and only on the networks that the
 // Charter covers, which they are deployed on. An address without code isn't
 // identified.
 func Calls(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*TransactionCalls, error) {
+	reader, err := RequestReader(ctx, dial, request)
+	if err != nil {
+		return nil, err
+	}
+	return reader.Calls(ctx, &request.Proposal.Transaction)
+}
+
+// RequestReader returns the reader of the calls of request's transaction, as
+// Calls reads them: of its Safe on its chain, at its SafeBlock, connecting with
+// dial, and deriving the addresses of contracts that CreateCall deploys with
+// CREATE from the nonces at that block (see DeriveCreateNonces).
+func RequestReader(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*CallReader, error) {
 	tx := &request.Proposal.Transaction
 	// A malformed transaction is an error before anything is read.
 	if _, err := components(tx); err != nil {
@@ -116,19 +163,22 @@ func Calls(ctx context.Context, dial ethrpc.Dialer, request *safenet.Request) (*
 	if err != nil {
 		return nil, err
 	}
-	return NewCallReader(client, tx.Safe, ethrpc.BlockNumber(request.Proposal.SafeBlock)).Calls(ctx, tx)
+	return NewCallReader(client, tx.Safe, ethrpc.BlockNumber(request.Proposal.SafeBlock)).DeriveCreateNonces(), nil
 }
 
 // CallReader reads the calls of the Safe transactions of a Safe, as Calls does,
 // such as those that the Safe executed before a proposal, as of one block. It
 // reads each account once, so that it can read many transactions.
 type CallReader struct {
-	client  *ethrpc.Client
-	block   ethrpc.BlockNumber
-	safe    ethrpc.Address
-	chainID uint64
-	covered bool
-	codes   map[ethrpc.Address]ethrpc.Bytes
+	// createNonces is whether the reader derives the addresses of the contracts
+	// that CreateCall deploys with CREATE, from the deployers' nonces at the block.
+	createNonces bool
+	client       *ethrpc.Client
+	block        ethrpc.BlockNumber
+	safe         ethrpc.Address
+	chainID      uint64
+	covered      bool
+	codes        map[ethrpc.Address]ethrpc.Bytes
 	// safeAccount is the Safe, once read.
 	safeAccount *SafeAccount
 }
@@ -144,6 +194,11 @@ func NewCallReader(client *ethrpc.Client, safe ethrpc.Address, block ethrpc.Bloc
 		covered: slices.Contains(networks, client.ChainID()),
 		codes:   map[ethrpc.Address]ethrpc.Bytes{},
 	}
+}
+
+// Client returns the client of the node that the reader reads.
+func (r *CallReader) Client() *ethrpc.Client {
+	return r.client
 }
 
 // Calls returns the calls that tx makes, as the package-level Calls returns
@@ -187,7 +242,27 @@ func (r *CallReader) Calls(ctx context.Context, tx *safenet.SafeTransaction) (*T
 		}
 		report.Calls = append(report.Calls, reported)
 	}
+	if err := r.creations(ctx, report.Calls); err != nil {
+		return nil, err
+	}
 	return report, nil
+}
+
+// DeriveCreateNonces makes the reader derive the addresses of the contracts
+// that the calls to a CreateCall deploy with CREATE, from the deployers' nonces
+// at the reader's block, which are their nonces when a transaction runs only if
+// it runs right after the block, such as a proposal's transaction at its Safe
+// block. Without it, only the CREATE2 addresses are derived, since they don't
+// depend on the state. It returns the reader.
+func (r *CallReader) DeriveCreateNonces() *CallReader {
+	r.createNonces = true
+	return r
+}
+
+// Code returns the code of the account at address as of the reader's block,
+// reading it once.
+func (r *CallReader) Code(ctx context.Context, address ethrpc.Address) (ethrpc.Bytes, error) {
+	return r.code(ctx, address)
 }
 
 // code returns the code of address, reading it once.
@@ -264,6 +339,9 @@ func (r *CallReader) account(ctx context.Context, address ethrpc.Address) (Accou
 	}
 	if r.covered && len(c) > 0 {
 		a.Contract = contractAt(address)
+		if cc, ok := isCreateCall(address, c); ok {
+			a.Contract = &Contract{Name: "CreateCall", Version: cc.version}
+		}
 	}
 	return a, nil
 }

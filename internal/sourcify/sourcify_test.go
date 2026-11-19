@@ -61,8 +61,8 @@ func TestContract(t *testing.T) {
 		Name:         "contracts/C.sol:C",
 		Compiler:     "0.7.6+commit.7338295f",
 		ABI: []solabi.ABIEntry{
-			{Type: "constructor", Inputs: []solabi.ABIParam{{Type: "address"}}, StateMutability: "nonpayable"},
-			{Type: "function", Name: "f", Inputs: []solabi.ABIParam{{Type: "uint256"}}, StateMutability: "view"},
+			{Type: "constructor", Inputs: []solabi.ABIParam{{Name: "x", Type: "address"}}, StateMutability: "nonpayable"},
+			{Type: "function", Name: "f", Inputs: []solabi.ABIParam{{Name: "a", Type: "uint256"}}, Outputs: []solabi.ABIParam{}, StateMutability: "view"},
 			{Type: "fallback", StateMutability: "payable"},
 		},
 		// The sources are in the order of their paths.

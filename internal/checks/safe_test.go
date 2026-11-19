@@ -41,6 +41,7 @@ func must[T any](v T, err error) T {
 type account struct {
 	code  ethrpc.Bytes
 	slot0 ethrpc.Hash
+	nonce uint64
 }
 
 // proxy returns the account of a SafeProxy with code, whose singleton is
@@ -58,8 +59,10 @@ type fakeNode struct {
 	// reads counts the eth_getCode and eth_getStorageAt requests that the node
 	// answered.
 	reads atomic.Int64
-	// fail is a method that the node answers with an error.
-	fail string
+	// fail is a method that the node answers with an error, with the HTTP status
+	// failStatus if it is set.
+	fail       string
+	failStatus int
 }
 
 // dialer starts the node, and returns a Dialer that connects to it for any
@@ -78,6 +81,10 @@ func (n *fakeNode) dialer(t *testing.T, block uint64) ethrpc.Dialer {
 			return
 		}
 		reply := map[string]any{"jsonrpc": "2.0", "id": req.ID}
+		if req.Method == n.fail && n.failStatus != 0 {
+			http.Error(w, "overloaded", n.failStatus)
+			return
+		}
 		if req.Method == n.fail {
 			reply["error"] = map[string]any{"code": -32000, "message": "missing trie node"}
 			json.NewEncoder(w).Encode(reply)
@@ -103,6 +110,8 @@ func (n *fakeNode) dialer(t *testing.T, block uint64) ethrpc.Dialer {
 			reply["result"] = ethrpc.Quantity(chainID)
 		case "eth_getCode":
 			reply["result"] = read().code
+		case "eth_getTransactionCount":
+			reply["result"] = ethrpc.Quantity(read().nonce)
 		case "eth_getStorageAt":
 			if len(req.Params) != 3 || string(req.Params[1]) != `"`+(ethrpc.Hash{}).String()+`"` {
 				t.Errorf("eth_getStorageAt: got params %s, want slot 0", req.Params)

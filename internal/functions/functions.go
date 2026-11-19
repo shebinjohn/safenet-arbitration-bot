@@ -1,6 +1,7 @@
 // Package functions decodes the call data of well-known functions: those of
-// ERC-20 tokens, the execTransaction of Safe 1.3.0, 1.4.1, and 1.5.0, and the
-// createProxyWithNonce of their proxy factories.
+// ERC-20 tokens, the execTransaction of Safe 1.3.0, 1.4.1, and 1.5.0, the
+// createProxyWithNonce of their proxy factories, and the performCreate and
+// performCreate2 of their CreateCall contracts.
 //
 // Call data is decoded by its selector and ABI layout only, so data that
 // decodes as one of them says nothing about the contract that it calls, whose
@@ -28,8 +29,8 @@ type Function struct {
 type Arg struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
-	// Value is an address, a *big.Int, a uint64, or bytes, all of which encode in
-	// JSON as text or numbers.
+	// Value is an address, a *big.Int, a uint64, a 32-byte word, or bytes, all of
+	// which encode in JSON as text or numbers.
 	Value any `json:"value"`
 	// Call is the decoded call data of a bytes argument that is the data of a call
 	// that the function makes, such as the data of execTransaction, if it is that
@@ -88,6 +89,12 @@ func init() {
 	// Safe proxy factories. They deploy a proxy of singleton, and call it with the
 	// initializer.
 	define("createProxyWithNonce", p("address", "singleton"), p("bytes", "initializer"), p("uint256", "saltNonce"))
+
+	// Safe CreateCall. It deploys a contract with the init code deploymentData and
+	// value, with CREATE, or CREATE2 and salt, from its own address, or from the
+	// Safe's if the Safe delegate calls it.
+	define("performCreate", p("uint256", "value"), p("bytes", "deploymentData"))
+	define("performCreate2", p("uint256", "value"), p("bytes", "deploymentData"), p("bytes32", "salt"))
 }
 
 // maxDepth is how many levels of nested call data Decode decodes.
@@ -122,6 +129,8 @@ func decode(calldata []byte, depth int) *Function {
 			arg.Value = ethrpc.Address(w[12:])
 		case "uint256":
 			arg.Value = d.Uint(i)
+		case "bytes32":
+			arg.Value = ethrpc.Hash(d.Bytes32(i))
 		case "uint8":
 			v := d.Uint64(i)
 			if v > 255 {

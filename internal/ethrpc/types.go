@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -165,6 +166,27 @@ type CallRequest struct {
 	From Address `json:"from,omitzero"`
 	To   Address `json:"to"`
 	Data Bytes   `json:"data,omitempty"`
+	// Value is the native currency that the call sends, or nil for none.
+	Value *BigQuantity `json:"value,omitempty"`
+}
+
+// BigQuantity is an integer of any size, encoded as a JSON-RPC quantity, such
+// as "0x1a".
+type BigQuantity big.Int
+
+func (q *BigQuantity) MarshalText() ([]byte, error) {
+	return []byte("0x" + (*big.Int)(q).Text(16)), nil
+}
+
+func (q *BigQuantity) UnmarshalText(text []byte) error {
+	digits, ok := strings.CutPrefix(string(text), "0x")
+	if !ok || digits == "" {
+		return fmt.Errorf("invalid quantity %q", text)
+	}
+	if _, ok := (*big.Int)(q).SetString(digits, 16); !ok {
+		return fmt.Errorf("invalid quantity %q", text)
+	}
+	return nil
 }
 
 // LogFilter selects the logs that eth_getLogs returns.

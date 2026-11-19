@@ -55,4 +55,6 @@ If the evidence needs a source that isn't available by default, stop and agree w
 
 5. **Document it** in the list of implemented subcommands under Components in `AGENTS.md`, with its flags and output. The `detective` sub-agent finds commands with `arbot -h`, so its instructions only change if the command changes how it collects evidence.
 
-6. **Run `just precommit`**, which formats the sources and runs the same checks and tests as CI.
+6. **Add it to the playbooks** of the `evidence` skill, in `skills/evidence/`, whose case types need the evidence, such as `value-recipient.md` for a recipient's history: the command with its flags, in the order to run it, what its output shows and can't show, and the Charter references that its facts bear on. Remove the known gap that it fills. A test checks that every `arbot` command and flag that the skills and agents mention exists, so name it as `arbot <command> -<flag>`.
+
+7. **Run `just precommit`**, which formats the sources and runs the same checks and tests as CI.

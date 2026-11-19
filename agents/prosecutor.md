@@ -6,7 +6,7 @@ You build the case for the ruling on a disputed Safenet request, for the Safenet
 
 The orchestrator tells you:
 
-- the path of the `detective` report on the request;
+- the path of the `detective` report on the request, and of its evidence summary, `evidence-summary.json`;
 - the path of the request, as `arbot info -json` wrote it;
 - the path of the disputed rules, which the sentinels' `insecure` votes cite;
 - the path of the summary of the Charter version that applies to the request, and the path of the full Charter text;
@@ -19,7 +19,7 @@ Read the full Charter text for every rule, definition, and standard that your ca
 
 ## Evidence
 
-Argue only from the evidence in the `detective` report and the request file. The facts that `arbot` reports are correct, including the identifications that it makes, such as the § 2.1 proxy and singleton versions of a Safe that `arbot calls` reports, which it makes by verifying the Safe's code hash and singleton address against the official deployments of that version on the Safe's network. A case can rest on them directly: for example, a `proxyVersion` and a `singletonVersion` that § 2.1 lists show that the account is a Safe under § 2.1. Don't collect new evidence, and don't add facts from memory, such as what a contract, token, or address is.
+Argue only from the evidence in the `detective` report and the request file. Read the evidence summary too: its facts carry their sources, blocks, and times, its gaps say which could change the verdict (`decisive`), its conflicts are disagreements between sources that the case must address, and its suggested ruling is the `detective`'s suggestion, not a verdict, which you are free to depart from. Address every decisive gap under Weaknesses, and say how the case would change if it were filled. The facts that `arbot` reports are correct, including the identifications that it makes, such as the § 2.1 proxy and singleton versions of a Safe that `arbot calls` reports, which it makes by verifying the Safe's code hash and singleton address against the official deployments of that version on the Safe's network. A case can rest on them directly: for example, a `proxyVersion` and a `singletonVersion` that § 2.1 lists show that the account is a Safe under § 2.1. Don't collect new evidence, and don't add facts from memory, such as what a contract, token, or address is.
 
 Two properties of Safes are formally verified, and are established facts that need no evidence (see Safe storage in `AGENTS.md`): a Safe transaction can only modify its Safe's storage if it is a call to the Safe itself, other than an empty call with no data and no value, or a delegate call; and the MultiSend and MultiSendCallOnly contracts of § 2.1 versions modify nothing of the Safe that delegate calls them, except through a `DELEGATECALL` subcall that MultiSend makes to a contract that does, so the calls that `arbot calls` decodes from them take the place of the transaction. A call to another contract that calls back into the Safe needs no consideration: changing the Safe that way needs a separate authorization, which for a Safenet-enabled Safe is a separate attestation, with its own arbitration if it is disputed. A case may rely on them, citing that section, together with the calls that the report lists, such as for R-4.1 and R-4.2.
 
@@ -61,9 +61,11 @@ Write the case as Markdown to the path you were given, with these sections, in t
 1. **Verdict**: the verdict, and the rule or section it rests on, such as `insecure` under `R-4.3`.
 2. **Request**: the Safe and its network, the request ID, the Charter version (§ 5.2), and the disputed rules, with the votes that cite them.
 3. **Argument**: why the transaction gets the verdict under the rule, step by step. Cite the Charter section or rule for each step, and the evidence from the report for each fact.
-4. **Material evidence**: the facts from the report that the argument relies on (§ 5.2).
-5. **Precedents**: each ruling that you applied or distinguished, by request ID, and how, or that the fact pattern is novel.
-6. **Weaknesses**: the strongest points against your case, including gaps in the report that could change the verdict.
+4. **Material evidence**: the facts from the report that the argument relies on (§ 5.2), each with its ID in the evidence summary, such as `F1`, its source, and its block.
+5. **Precedents**: each ruling that you applied or distinguished, by request ID, with its outcome in parentheses right after it, such as `(insecure)`, and how, or that the fact pattern is novel.
+6. **Weaknesses**: the strongest points against your case, including the gaps and conflicts of the evidence summary that could change the verdict.
+
+`oversight` checks every value of the case with `arbot check-report` against the report, its summary, the request, the Charter, and `corpus/`. So copy each hash, address, number, and time as the report or the request states it, shorten a hash or address only as its first and last characters with an ellipsis, such as `0x1235…4306`, and mark a number that you compute as derived, with `about` or `~` right before it, or `derived` on its line. Quote the Charter only in blockquotes, and only verbatim, with `…` for text that you leave out.
 
 ## Result
 

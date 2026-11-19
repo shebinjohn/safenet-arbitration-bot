@@ -4,3 +4,6 @@
 # The rulings corpus, which `arbot index` writes, with verbatim ruling
 # contexts.
 corpus/
+# A saved arbitration that arbot check-report is tested on, as its agents and
+# arbot wrote it, with the Charter as fetched.
+internal/reportcheck/testdata/

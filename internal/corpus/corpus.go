@@ -210,6 +210,12 @@ func Tags(content []byte) (header, document []Tag, err error) {
 	return header, document, nil
 }
 
+// Header returns the tags of the header of the corpus file content, such as its
+// outcome, without reading its ruling document.
+func Header(content []byte) ([]Tag, error) {
+	return parseHeader(string(content))
+}
+
 // parseHeader parses the header that text starts with, and returns its tags.
 func parseHeader(text string) ([]Tag, error) {
 	rest, ok := strings.CutPrefix(text, "---\n")

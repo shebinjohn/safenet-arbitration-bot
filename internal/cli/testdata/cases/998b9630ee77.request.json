@@ -1,0 +1,78 @@
+{
+  "id": "0x998b9630ee776a1fd86e754653d303e9819fdf36a5cde274c56c61cfc4d0319f",
+  "oracle": "0x4f61b8832978e83b80d69551aef07557dbe41d03",
+  "charter": "charter.safenet-gov.eth",
+  "feeToken": {
+    "address": "0x2a22f9c3b484c3629090feed35f17ff8f88f76f0",
+    "symbol": "USDC.e",
+    "decimals": 6
+  },
+  "state": "FROZEN",
+  "terms": {
+    "sponsor": "0x1f992a6d25be601af531f6f762afee8cc479c38c",
+    "bond": 800000000,
+    "slashAmount": 400000,
+    "daoFeeShare": 0,
+    "commitDeadline": 49343180,
+    "revealDeadline": 49343186
+  },
+  "fee": 400000,
+  "proposal": {
+    "consensus": "0xc855761d619f6002923507ce68b84d7689c2aa96",
+    "block": 49343174,
+    "time": "2026-11-18T12:36:15Z",
+    "ethereumBlock": 26441983,
+    "safeBlock": 26441983,
+    "txHash": "0x34730cee43af59f0ee8b0836dddf238e9350888bd60d8652cfc794597ab7323e",
+    "epoch": 34266,
+    "oracleData": "0x",
+    "safeTxHash": "0x7703cb8e5e0ba3a7efd304d1758d097359eb6de1fb4bfb5bf5ef8f66d10257b8",
+    "transaction": {
+      "chainId": 1,
+      "safe": "0xbbca3b4e45b91031bcd498bd045203d0d113c956",
+      "to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "value": 0,
+      "data": "0xa9059cbb000000000000000000000000123593c1b9b8872fafec7e67baec8422583443060000000000000000000000000000000000000000000000000000000010b0c247",
+      "operation": "CALL",
+      "safeTxGas": 0,
+      "baseGas": 0,
+      "gasPrice": 0,
+      "gasToken": "0x0000000000000000000000000000000000000000",
+      "refundReceiver": "0x0000000000000000000000000000000000000000",
+      "nonce": 122
+    }
+  },
+  "votes": [
+    {
+      "sentinel": "0xc84a0928632382e75c543acced101b9525027362",
+      "bond": 800000000,
+      "vote": "DENIED",
+      "reason": "R-4.3",
+      "rules": [
+        "R-4.3"
+      ]
+    },
+    {
+      "sentinel": "0x101d59dbb8c5e70f45d52634f23800fca4fbe031",
+      "bond": 800000000,
+      "vote": "APPROVED",
+      "reason": "",
+      "rules": []
+    },
+    {
+      "sentinel": "0x6d081448c04d9ef7cf8ecf54207b1931ecc25312",
+      "bond": 800000000,
+      "vote": "APPROVED",
+      "reason": "",
+      "rules": []
+    }
+  ],
+  "disputedRules": [
+    "R-4.3"
+  ],
+  "arbitration": {
+    "frozenBlock": 49343181,
+    "deadline": 49827021,
+    "outcome": "pending"
+  }
+}

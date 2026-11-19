@@ -454,23 +454,27 @@
       }
     ]
   },
-  "service": {
-    "/api/v1/multisig-transactions/0x0373f5e60cba42f9398ae7193522cffed6763d802c2dfd2aba7ef007ff5a9ee8/": {
-      "baseGas": 0,
-      "blockNumber": 26432179,
-      "gasPrice": "0",
-      "gasToken": "0x0000000000000000000000000000000000000000",
-      "isExecuted": true,
-      "isSuccessful": true,
-      "nonce": 25,
-      "operation": 1,
-      "refundReceiver": "0x0000000000000000000000000000000000000000",
-      "safe": "0x47623C62f281807D615eeb4A2CEee9d97F9D3C49",
-      "safeTxGas": 0,
-      "safeTxHash": "0x0373f5e60cba42f9398ae7193522cffed6763d802c2dfd2aba7ef007ff5a9ee8",
-      "to": "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
-      "transactionHash": "0xac1efe99e29b3bc4b3fd5a05fddfa2dd3d27f942d40620847f1d52e9d3803e83",
-      "value": "0"
+  "http": {
+    "txservice": {
+      "/api/v1/multisig-transactions/0x0373f5e60cba42f9398ae7193522cffed6763d802c2dfd2aba7ef007ff5a9ee8/": {
+        "body": {
+          "baseGas": 0,
+          "blockNumber": 26432179,
+          "gasPrice": "0",
+          "gasToken": "0x0000000000000000000000000000000000000000",
+          "isExecuted": true,
+          "isSuccessful": true,
+          "nonce": 25,
+          "operation": 1,
+          "refundReceiver": "0x0000000000000000000000000000000000000000",
+          "safe": "0x47623C62f281807D615eeb4A2CEee9d97F9D3C49",
+          "safeTxGas": 0,
+          "safeTxHash": "0x0373f5e60cba42f9398ae7193522cffed6763d802c2dfd2aba7ef007ff5a9ee8",
+          "to": "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
+          "transactionHash": "0xac1efe99e29b3bc4b3fd5a05fddfa2dd3d27f942d40620847f1d52e9d3803e83",
+          "value": "0"
+        }
+      }
     }
   }
 }

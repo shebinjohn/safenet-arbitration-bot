@@ -62,6 +62,21 @@ check-testdata:
             || { echo "$file is not formatted with jq"; exit 1; }
     done
 
+# The vectors are those of https://github.com/safe-research/sentinel-test-vectors,
+# cloned into `dir`. The harness reads their chains at old blocks, so it needs
+# an archive node, such as one in `arbot.config.json`, and it isn't part of CI.
+# Run arbot's checks and evidence playbooks on the Sentinel test vectors, e.g.
+# `just vectors ../sentinel-test-vectors -config my.config.json`.
+vectors dir="../sentinel-test-vectors" *args="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -d "{{dir}}/specs" ]; then
+        echo "no vectors in {{dir}}: clone them with" >&2
+        echo "  git clone https://github.com/safe-research/sentinel-test-vectors {{dir}}" >&2
+        exit 1
+    fi
+    go run ./internal/cmd/vectors {{args}} "{{dir}}"
+
 # Run all of the checks that CI runs.
 ci: check test check-agent-stubs check-testdata
 

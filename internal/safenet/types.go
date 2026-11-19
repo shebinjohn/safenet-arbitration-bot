@@ -43,6 +43,25 @@ type Request struct {
 	DisputedRules []string `json:"disputedRules"`
 	// Arbitration is nil unless a split vote froze the request.
 	Arbitration *Arbitration `json:"arbitration"`
+	// Vector is the Sentinel test vector that the request was made from, by arbot
+	// vector, or nil for a request of the oracle. A request of a vector has no
+	// oracle fields, so the commands that read the oracle don't apply to it.
+	Vector *Vector `json:"vector,omitempty"`
+}
+
+// Vector identifies the Sentinel test vector that a request was made from, with
+// the verdict and the rule that the vector expects.
+type Vector struct {
+	// Path is the path of the vector's spec file, as it was given.
+	Path string `json:"path"`
+	// Verdict is "secure" or "insecure", and Rule is the rule that an insecure
+	// vector cites, or empty.
+	Verdict string `json:"verdict"`
+	Rule    string `json:"rule"`
+	// EOA is whether the vector is recast from a transaction of an externally owned
+	// account, so that no Safe exists at the transaction's Safe address, which
+	// R-4.0 finds insecure.
+	EOA bool `json:"eoa"`
 }
 
 // Token is an ERC-20 token.

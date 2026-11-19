@@ -1,0 +1,26 @@
+{
+  "request": {
+    "block": "0x18a7c66",
+    "transaction": {
+      "chainId": "0x1",
+      "safe": "0xAb876791757b47D202B7d6DeF038940cE7A64fe4",
+      "to": "0x977271f3DdD39293f50E739ab40df46C51927de5",
+      "value": "0x1e87f85809dc0000",
+      "data": "0x",
+      "operation": 0,
+      "safeTxGas": "0x0",
+      "baseGas": "0x0",
+      "gasPrice": "0x0",
+      "gasToken": "0x0000000000000000000000000000000000000000",
+      "refundReceiver": "0x0000000000000000000000000000000000000000",
+      "nonce": "0x23"
+    }
+  },
+  "response": {
+    "verdict": "secure"
+  },
+  "metadata": {
+    "note": "Ether transfer to an address with prior interaction (other ether transfer 2 months prior)",
+    "exampleTransaction": "0xc42b1d5549212e514deda54060c0ae04f5ea185335a74fbbaf98953ea569e471"
+  }
+}

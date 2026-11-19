@@ -20,7 +20,10 @@
 // needs the oracle request, which a vector doesn't have, such as arbot status.
 // It skips the optional arbot explorer commands, which read Etherscan, unless
 // the configuration has an Etherscan API key, so that a run without one doesn't
-// fail on them: their evidence is a gap, "Etherscan not configured".
+// fail on them: their evidence is a gap, "Etherscan not configured". It skips
+// the optional arbot source github commands unless the configuration has a
+// GitHub token, without which they can't search GitHub's code, and only compare
+// the artifacts that -candidate names, which a playbook doesn't.
 //
 // It runs arbot in-process, one command at a time, since public RPCs rate
 // limit, and runs a command that fails because a request to a node failed
@@ -82,6 +85,16 @@ var oracleCommands = []string{"status", "info", "charter"}
 // only if an Etherscan API key is configured, and record as a gap otherwise.
 const explorerCommand = "explorer"
 
+// sourceCommand is the command that reads offchain sources, whose github
+// subcommand the playbooks run only to search GitHub's code, which needs a
+// GitHub token.
+const sourceCommand = "source"
+
+// offchainHint is what arbot writes after the error of a command that failed
+// because a request to an offchain source, such as GitHub, failed rather than
+// being answered.
+const offchainHint = "a request to an offchain source failed rather than being answered"
+
 // etherscanHint is what arbot writes after the error of a command that failed
 // because a request to Etherscan failed rather than being answered.
 const etherscanHint = "a request to Etherscan failed rather than being answered"
@@ -119,7 +132,7 @@ func main() {
 	if err != nil {
 		fatalf("%v", err)
 	}
-	h := &harness{config: *config, retries: *retries, wait: *wait, timeout: *timeout, keep: *keep, etherscan: cfg.Etherscan.APIKey != ""}
+	h := &harness{config: *config, retries: *retries, wait: *wait, timeout: *timeout, keep: *keep, etherscan: cfg.Etherscan.APIKey != "", github: cfg.GitHub.Token != ""}
 	if err := h.main(dir, *out, *skills, filter); err != nil {
 		fatalf("%v", err)
 	}
@@ -141,6 +154,9 @@ type harness struct {
 	// etherscan is whether the configuration has an Etherscan API key, without
 	// which the optional explorer commands of the playbooks are skipped.
 	etherscan bool
+	// github is whether the configuration has a GitHub token, without which the
+	// optional source github commands of the playbooks are skipped.
+	github bool
 }
 
 func (h *harness) main(dir, out, skills string, filter *regexp.Regexp) error {
@@ -283,7 +299,7 @@ func (h *harness) vector(path, name, dir string, books []playbooks.Playbook) (*v
 				continue
 			}
 			ran[key] = true
-			if reason := h.skip(args[0]); reason != "" {
+			if reason := h.skip(args); reason != "" {
 				r.Commands = append(r.Commands, vector.Command{Playbook: book.Name, Line: line, Status: vector.CommandSkipped, Error: reason})
 				continue
 			}
@@ -317,8 +333,11 @@ func (h *harness) vector(path, name, dir string, books []playbooks.Playbook) (*v
 
 // skip returns why a playbook's command doesn't run on a vector, or "" if it
 // runs.
-func (h *harness) skip(command string) string {
+func (h *harness) skip(args []string) string {
+	command := args[0]
 	switch {
+	case command == sourceCommand && len(args) > 1 && args[1] == "github" && !h.github:
+		return "GitHub not configured: the optional source github commands need a GitHub token to search GitHub's code, so their evidence is a gap"
 	case command == explorerCommand && !h.etherscan:
 		return "Etherscan not configured: the optional explorer commands need an Etherscan API key, so their evidence is a gap"
 	case slices.Contains(oracleCommands, command):
@@ -357,7 +376,7 @@ func (h *harness) run(book string, args []string) (vector.Command, []byte) {
 		}
 		c.Status, c.Error = vector.CommandFailed, errText
 		contains := func(p string) bool { return strings.Contains(errText, p) }
-		transient := contains(transientHint) || contains(etherscanHint) || slices.ContainsFunc(serviceFailures, contains)
+		transient := contains(transientHint) || contains(etherscanHint) || contains(offchainHint) || slices.ContainsFunc(serviceFailures, contains)
 		c.NodeError = transient || slices.ContainsFunc(prunedState, contains)
 		if !transient || try == h.retries {
 			return c, stdout.Bytes()

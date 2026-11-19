@@ -79,6 +79,29 @@ func (a *Arbot) WithTxService(tb testing.TB, chainID uint64, url string) *Arbot 
 	return &Arbot{config: path}
 }
 
+// WithSetting returns an Arbot configured like a, but with the setting key of
+// the configuration file set to value, such as "github".
+func (a *Arbot) WithSetting(tb testing.TB, key string, value any) *Arbot {
+	tb.Helper()
+	data, err := os.ReadFile(a.config)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		tb.Fatal(err)
+	}
+	config[key] = value
+	if data, err = json.Marshal(config); err != nil {
+		tb.Fatal(err)
+	}
+	path := filepath.Join(tb.TempDir(), "config.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		tb.Fatal(err)
+	}
+	return &Arbot{config: path}
+}
+
 // Run runs arbot with args, and returns its stdout. It fails the test if arbot
 // fails.
 func (a *Arbot) Run(tb testing.TB, args ...string) []byte {

@@ -46,6 +46,35 @@ type Config struct {
 	// has no default key, so those commands fail without one, and no other command
 	// needs it.
 	Etherscan Etherscan `json:"etherscan"`
+	// GitHub is the GitHub API that arbot source reads. Its token is optional: only
+	// a code search needs one.
+	GitHub GitHub `json:"github"`
+	// Sources are the offchain sources that arbot source fetch may fetch web pages
+	// from. There is no default, so without them it fetches nothing.
+	Sources Sources `json:"sources"`
+}
+
+// GitHub is the configuration of GitHub.
+type GitHub struct {
+	// Token authenticates the requests to the API, which code search needs, and
+	// which raises the rate limit of the others. It is a secret: it is never
+	// printed, and only sent to URL, in the Authorization header.
+	Token string `json:"token"`
+	// URL is the base URL of GitHub's REST API. If empty, "https://api.github.com"
+	// is used.
+	URL string `json:"url"`
+	// RawURL is the base URL that the files of repositories are fetched from, by
+	// owner, repository, commit, and path, without the token. If empty,
+	// "https://raw.githubusercontent.com" is used.
+	RawURL string `json:"rawUrl"`
+}
+
+// Sources is the configuration of the web pages that arbot source fetch may
+// fetch.
+type Sources struct {
+	// Allow are the hosts that it fetches from, exactly, such as "github.com", over
+	// HTTPS only. A host with a port, such as "localhost:8443", allows that port.
+	Allow []string `json:"allow"`
 }
 
 // Etherscan is the configuration of the Etherscan API.

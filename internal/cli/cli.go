@@ -15,6 +15,8 @@ import (
 	"github.com/safe-research/safenet-arbitration-bot/internal/config"
 	"github.com/safe-research/safenet-arbitration-bot/internal/etherscan"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/ghsource"
+	"github.com/safe-research/safenet-arbitration-bot/internal/webfetch"
 )
 
 // env is what a command runs with.
@@ -43,6 +45,7 @@ var commands = map[string]struct {
 	"info":            {info, "show a Safenet request, its proposal, votes, and arbitration"},
 	"pending":         {pending, "list the disputed Safenet requests awaiting arbitration"},
 	"safe":            {safeCommand, "show the settings of the Safe of a Safenet request, or of another account, or compare them"},
+	"source":          {sourceCommand, "read an offchain source: GitHub artifacts matched by bytecode, the Charter's issues, or a web page"},
 	"simulate":        {simulateCommand, "simulate a call that the Safe transaction of a Safenet request makes, at its Safe block"},
 	"status":          {statusCommand, "report whether and when the Safe transaction of a Safenet request was executed, against its voting"},
 	"signatures":      {signaturesCommand, "list the functions of a contract on the Safe's chain of a Safenet request"},
@@ -82,6 +85,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		// The node didn't answer, which says nothing about the chain: the command
 		// failed rather than report something it couldn't read.
 		fmt.Fprintf(stderr, "%s: a request to the node failed rather than being answered; run the command again later, or with another RPC URL in the config\n", e.progname)
+	}
+	if ghsource.Transient(err) || webfetch.Transient(err) {
+		fmt.Fprintf(stderr, "%s: a request to an offchain source failed rather than being answered; run the command again later\n", e.progname)
 	}
 	if etherscan.Transient(err) {
 		fmt.Fprintf(stderr, "%s: a request to Etherscan failed rather than being answered; run the command again later\n", e.progname)

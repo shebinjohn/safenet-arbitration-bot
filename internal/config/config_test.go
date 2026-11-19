@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -111,6 +112,8 @@ func TestLoadRejectsInvalidConfig(t *testing.T) {
 		"unknown field":           `{"unknown": true}`,
 		"trailing data":           `{} {}`,
 		"unknown etherscan field": `{"etherscan": {"key": "TESTKEY"}}`,
+		"unknown github field":    `{"github": {"apiKey": "TESTTOKEN"}}`,
+		"allow not a list":        `{"sources": {"allow": "github.com"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			cwd, _, _ := setup(t)
@@ -133,7 +136,9 @@ func TestLoadSettings(t *testing.T) {
 		"sourcify": "https://sourcify.example/server",
 		"consensus": "0x00000000000000000000000000000000000000aa",
 		"oracle": "0x00000000000000000000000000000000000000bb",
-		"etherscan": {"apiKey": "TESTKEY", "url": "https://etherscan.example/v2/api"}
+		"etherscan": {"apiKey": "TESTKEY", "url": "https://etherscan.example/v2/api"},
+		"github": {"token": "TESTTOKEN", "url": "https://github.example/api", "rawUrl": "https://raw.github.example"},
+		"sources": {"allow": ["docs.example", "localhost:8443"]}
 	}`)
 
 	config, err := Load(path)
@@ -148,8 +153,10 @@ func TestLoadSettings(t *testing.T) {
 		Consensus:  ethrpc.Address{19: 0xaa},
 		Oracle:     ethrpc.Address{19: 0xbb},
 		Etherscan:  Etherscan{APIKey: "TESTKEY", URL: "https://etherscan.example/v2/api"},
+		GitHub:     GitHub{Token: "TESTTOKEN", URL: "https://github.example/api", RawURL: "https://raw.github.example"},
+		Sources:    Sources{Allow: []string{"docs.example", "localhost:8443"}},
 	}
-	if !maps.Equal(config.RPCs, want.RPCs) || !maps.Equal(config.TxServices, want.TxServices) || config.IPFS != want.IPFS || config.Sourcify != want.Sourcify || config.Oracle != want.Oracle || config.Consensus != want.Consensus || config.Etherscan != want.Etherscan {
+	if !maps.Equal(config.RPCs, want.RPCs) || !maps.Equal(config.TxServices, want.TxServices) || config.IPFS != want.IPFS || config.Sourcify != want.Sourcify || config.Oracle != want.Oracle || config.Consensus != want.Consensus || config.Etherscan != want.Etherscan || config.GitHub != want.GitHub || !slices.Equal(config.Sources.Allow, want.Sources.Allow) {
 		t.Errorf("Load: got %+v, want %+v", config, want)
 	}
 }

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,7 +21,11 @@ type mention struct {
 	// dashes and values.
 	global  []string
 	command string
-	flags   []string
+	// sub is the word right after the command, if it isn't a flag or a placeholder,
+	// which is the subcommand of a command that has them, such as "github" in
+	// "arbot source github".
+	sub   string
+	flags []string
 }
 
 var (
@@ -92,6 +97,11 @@ func commandLines(line int, code string, valued func(command, flag string) bool)
 				continue
 			}
 			m.command = command
+			if len(rest) > 1 {
+				if sub := strings.Trim(rest[1], "[](),.:"); sub != "" && !strings.HasPrefix(sub, "-") && !strings.ContainsAny(sub, "<>{}/.|") {
+					m.sub = sub
+				}
+			}
 			depth := 0
 			for _, word := range rest[1:] {
 				// In a usage such as "[-blocks N | -all]", | is an alternative, not a pipe.
@@ -112,14 +122,12 @@ func commandLines(line int, code string, valued func(command, flag string) bool)
 	return found
 }
 
-// usageFlags returns the flags that arbot's usage lists, for a command, or for
-// arbot itself if command is "", and whether each takes a value.
-func usageFlags(t *testing.T, command string) map[string]bool {
+// usageFlags returns the flags that arbot's usage lists, for a command and its
+// subcommand, if it has one, or for arbot itself if command is empty, and
+// whether each takes a value.
+func usageFlags(t *testing.T, command ...string) map[string]bool {
 	t.Helper()
-	args := []string{"arbot", "-h"}
-	if command != "" {
-		args = []string{"arbot", command, "-h"}
-	}
+	args := append(append([]string{"arbot"}, command...), "-h")
 	var stdout, stderr bytes.Buffer
 	if code := Run(t.Context(), args, &stdout, &stderr); code != 0 {
 		t.Fatalf("%v: got status %d, stderr %q", args, code, stderr.String())
@@ -135,8 +143,17 @@ func usageFlags(t *testing.T, command string) map[string]bool {
 }
 
 func TestMentionedCommandsExist(t *testing.T) {
-	flags := map[string]map[string]bool{"": usageFlags(t, "")}
+	// subcommands are the subcommands of the commands whose subcommands have flags
+	// of their own.
+	subcommands := map[string][]string{"source": slices.Collect(maps.Keys(sourceCommands))}
+	flags := map[string]map[string]bool{"": usageFlags(t)}
 	for name := range commands {
+		if subs, ok := subcommands[name]; ok {
+			for _, sub := range subs {
+				flags[name+" "+sub] = usageFlags(t, name, sub)
+			}
+			continue
+		}
 		flags[name] = usageFlags(t, name)
 	}
 	valued := func(command, flag string) bool { return flags[command][flag] }
@@ -169,14 +186,25 @@ func TestMentionedCommandsExist(t *testing.T) {
 			if m.command == "" {
 				continue
 			}
-			commandFlags, ok := flags[m.command]
-			if !ok {
+			if _, ok := commands[m.command]; !ok {
 				t.Errorf("%s: arbot has no command %q", where, m.command)
 				continue
 			}
+			name := m.command
+			if subs, ok := subcommands[m.command]; ok {
+				if m.sub == "" && len(m.flags) == 0 {
+					continue
+				}
+				if !slices.Contains(subs, m.sub) {
+					t.Errorf("%s: arbot %s has no command %q", where, m.command, m.sub)
+					continue
+				}
+				name += " " + m.sub
+			}
+			commandFlags := flags[name]
 			for _, flag := range m.flags {
 				if _, ok := commandFlags[flag]; !ok {
-					t.Errorf("%s: arbot %s has no flag -%s", where, m.command, flag)
+					t.Errorf("%s: arbot %s has no flag -%s", where, name, flag)
 				}
 			}
 		}
@@ -195,6 +223,7 @@ func TestMentions(t *testing.T) {
 		"arbot explorer creation -request-file request.json | jq .",
 		"```",
 		"The `arbot` CLI, and ``arbot safe [-address <address>] [-blocks N | -all]``.",
+		"Run `arbot source github -candidate <candidate> -request-file <request.json> <address>`, or `arbot tags <request-id>`.",
 	}, "\n")
 	got := mentions(text, valued)
 	want := []mention{
@@ -202,9 +231,12 @@ func TestMentions(t *testing.T) {
 		// The paths and the placeholder aren't commands.
 		{line: 2},
 		{line: 2, global: []string{"h"}},
-		{line: 4, command: "explorer", flags: []string{"request-file"}},
+		{line: 4, command: "explorer", sub: "creation", flags: []string{"request-file"}},
 		{line: 6},
 		{line: 6, command: "safe", flags: []string{"address", "blocks", "all"}},
+		// A placeholder isn't a subcommand.
+		{line: 7, command: "source", sub: "github", flags: []string{"candidate", "request-file"}},
+		{line: 7, command: "tags"},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("got mentions\n%v\nwant\n%v", got, want)

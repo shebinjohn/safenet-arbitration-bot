@@ -95,13 +95,43 @@ func TestSkipExplorer(t *testing.T) {
 		t.Fatal("the playbooks run no explorer command")
 	}
 	without, with := &harness{}, &harness{etherscan: true}
-	if reason := without.skip(explorerCommand); !strings.Contains(reason, "Etherscan not configured") {
+	if reason := without.skip([]string{explorerCommand}); !strings.Contains(reason, "Etherscan not configured") {
 		t.Errorf("without a key: got %q, want the explorer commands skipped", reason)
 	}
-	if reason := with.skip(explorerCommand); reason != "" {
+	if reason := with.skip([]string{explorerCommand}); reason != "" {
 		t.Errorf("with a key: got %q, want the explorer commands run", reason)
 	}
-	if with.skip("status") == "" || with.skip("calls") != "" {
-		t.Errorf("got status skipped %q and calls skipped %q; want only status skipped", with.skip("status"), with.skip("calls"))
+	if with.skip([]string{"status"}) == "" || with.skip([]string{"calls"}) != "" {
+		t.Errorf("got status skipped %q and calls skipped %q; want only status skipped", with.skip([]string{"status"}), with.skip([]string{"calls"}))
+	}
+}
+
+// TestSkipSourceGitHub checks that the playbooks' optional source github
+// commands, which need a GitHub token to search, are skipped without one, and
+// run with one.
+func TestSkipSourceGitHub(t *testing.T) {
+	books, err := playbooks.Load("../../../skills/evidence")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found [][]string
+	for _, book := range books {
+		for _, line := range book.Commands {
+			if args := strings.Fields(strings.TrimPrefix(line, "arbot ")); args[0] == sourceCommand {
+				found = append(found, args)
+			}
+		}
+	}
+	if len(found) == 0 {
+		t.Fatal("the playbooks run no source command")
+	}
+	without, with := &harness{}, &harness{github: true}
+	for _, args := range found {
+		if reason := without.skip(args); !strings.Contains(reason, "GitHub not configured") {
+			t.Errorf("%v without a token: got %q, want it skipped", args, reason)
+		}
+		if reason := with.skip(args); reason != "" {
+			t.Errorf("%v with a token: got %q, want it run", args, reason)
+		}
 	}
 }

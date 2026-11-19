@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/config"
+	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 )
 
 // env is what a command runs with.
@@ -70,6 +71,11 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		code = 2
 	}
 	fmt.Fprintf(stderr, "%s: %v\n", e.progname, err)
+	if ethrpc.Transient(err) {
+		// The node didn't answer, which says nothing about the chain: the command
+		// failed rather than report something it couldn't read.
+		fmt.Fprintf(stderr, "%s: a request to the node failed rather than being answered; run the command again later, or with another RPC URL in the config\n", e.progname)
+	}
 	return code
 }
 

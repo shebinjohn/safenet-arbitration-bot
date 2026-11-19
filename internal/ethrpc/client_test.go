@@ -2,13 +2,17 @@ package ethrpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // testChainID is the chain that test nodes started by serve report.
@@ -497,5 +501,91 @@ func TestNewClientConnectionError(t *testing.T) {
 	t.Cleanup(server.Close)
 	if _, err := NewClient(t.Context(), testChainID, server.URL); err == nil {
 		t.Fatal("NewClient: expected an error")
+	}
+}
+
+func TestTransient(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"not found", fmt.Errorf("eth_getTransactionReceipt: transaction 0x01: %w", ErrNotFound), false},
+		{"JSON-RPC error", fmt.Errorf("eth_call: %w", &Error{Code: -32000, Message: "execution reverted"}), false},
+		{"unrelated error", errors.New("reading request file: no such file"), false},
+		{"rate limit in an HTTP 429 body", fmt.Errorf("eth_getTransactionReceipt: %w", &HTTPError{Status: "429 Too Many Requests", StatusCode: 429, Err: &Error{Code: -32016, Message: "over rate limit"}}), true},
+		{"rate limit with HTTP 200", fmt.Errorf("eth_call: %w", &Error{Code: -32005, Message: "Rate limit exceeded"}), true},
+		{"server error", fmt.Errorf("eth_call: %w", &HTTPError{Status: "500 Internal Server Error", StatusCode: 500, Body: "error"}), true},
+		{"refused method", fmt.Errorf("eth_call: %w", &HTTPError{Status: "403 Forbidden", StatusCode: 403, Err: &Error{Code: -32601, Message: "rpc method is not whitelisted"}}), false},
+		{"connection failure", fmt.Errorf("eth_call: %w", &url.Error{Op: "Post", URL: "https://node", Err: errors.New("connection refused")}), true},
+		{"canceled", fmt.Errorf("eth_call: %w", context.Canceled), false},
+	} {
+		if got := Transient(test.err); got != test.want {
+			t.Errorf("%s: Transient(%v) = %v, want %v", test.name, test.err, got, test.want)
+		}
+	}
+}
+
+func TestRequestHTTPErrorType(t *testing.T) {
+	url, _ := node(t, "0x1", func(w http.ResponseWriter, id uint64) {
+		http.Error(w, "unavailable", http.StatusInternalServerError)
+	})
+	_, err := connect(t, url).Call(t.Context(), CallRequest{}, 1)
+	httpErr, ok := errors.AsType[*HTTPError](err)
+	if !ok || httpErr.StatusCode != 500 || httpErr.Body != "unavailable" || !Transient(err) {
+		t.Errorf("Call: got %v, want a transient *HTTPError with status 500", err)
+	}
+}
+
+// fastRateLimitRetries makes the retries of rate-limited requests quick for a
+// test.
+func fastRateLimitRetries(t *testing.T) {
+	t.Helper()
+	delay, maxDelay := rateLimitDelay, rateLimitMaxDelay
+	rateLimitDelay, rateLimitMaxDelay = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { rateLimitDelay, rateLimitMaxDelay = delay, maxDelay })
+}
+
+func TestRawRequestRetriesRateLimit(t *testing.T) {
+	fastRateLimitRetries(t)
+	var calls atomic.Int64
+	url, _ := node(t, "0x1", func(w http.ResponseWriter, id uint64) {
+		res := map[string]any{"jsonrpc": "2.0", "id": id}
+		if calls.Add(1) <= 2 {
+			// A rate limit with HTTP status 200, which httpretry doesn't retry.
+			res["error"] = map[string]any{"code": -32005, "message": "Rate limit exceeded"}
+		} else {
+			res["result"] = "0x2a"
+		}
+		json.NewEncoder(w).Encode(res)
+	})
+	got, err := connect(t, url).BlockNumber(t.Context())
+	if err != nil || got != 42 || calls.Load() != 3 {
+		t.Errorf("BlockNumber: got %d, %v after %d requests, want 42 after 3", got, err, calls.Load())
+	}
+}
+
+func TestRawRequestRateLimitGivesUp(t *testing.T) {
+	fastRateLimitRetries(t)
+	var calls atomic.Int64
+	url, _ := node(t, "0x1", func(w http.ResponseWriter, id uint64) {
+		calls.Add(1)
+		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": -32005, "message": "Rate limit exceeded"}})
+	})
+	_, err := connect(t, url).BlockNumber(t.Context())
+	if !Transient(err) || calls.Load() != int64(rateLimitRetries+1) {
+		t.Errorf("BlockNumber: got %v after %d requests, want a transient error after %d", err, calls.Load(), rateLimitRetries+1)
+	}
+}
+
+func TestRawRequestDoesNotRetryOtherErrors(t *testing.T) {
+	var calls atomic.Int64
+	url, _ := node(t, "0x1", func(w http.ResponseWriter, id uint64) {
+		calls.Add(1)
+		json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": -32000, "message": "execution reverted"}})
+	})
+	if _, err := connect(t, url).Call(t.Context(), CallRequest{}, 1); err == nil || calls.Load() != 1 {
+		t.Errorf("Call: got %v after %d requests, want an error after 1", err, calls.Load())
 	}
 }

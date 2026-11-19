@@ -18,6 +18,9 @@
 // commands before it, such as <recipient> from the ERC-20 transfers that arbot
 // calls decodes, and skips a command whose placeholder it can't fill, or that
 // needs the oracle request, which a vector doesn't have, such as arbot status.
+// It skips the optional arbot explorer commands, which read Etherscan, unless
+// the configuration has an Etherscan API key, so that a run without one doesn't
+// fail on them: their evidence is a gap, "Etherscan not configured".
 //
 // It runs arbot in-process, one command at a time, since public RPCs rate
 // limit, and runs a command that fails because a request to a node failed
@@ -47,6 +50,7 @@ import (
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/checks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/cli"
+	arbotconfig "github.com/safe-research/safenet-arbitration-bot/internal/config"
 	"github.com/safe-research/safenet-arbitration-bot/internal/functions"
 	"github.com/safe-research/safenet-arbitration-bot/internal/playbooks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -73,6 +77,14 @@ var prunedState = []string{"missing trie node", "header not found", "historical 
 // oracleCommands are the commands that read a request's oracle fields, which a
 // vector's request doesn't have.
 var oracleCommands = []string{"status", "info", "charter"}
+
+// explorerCommand is the command that reads Etherscan, which the playbooks run
+// only if an Etherscan API key is configured, and record as a gap otherwise.
+const explorerCommand = "explorer"
+
+// etherscanHint is what arbot writes after the error of a command that failed
+// because a request to Etherscan failed rather than being answered.
+const etherscanHint = "a request to Etherscan failed rather than being answered"
 
 // maxValues is the most values that a placeholder is filled with, so that a
 // batch with many calls doesn't run a command for each of its accounts.
@@ -103,7 +115,11 @@ func main() {
 	if err != nil {
 		fatalf("-run: %v", err)
 	}
-	h := &harness{config: *config, retries: *retries, wait: *wait, timeout: *timeout, keep: *keep}
+	cfg, err := arbotconfig.Load(*config)
+	if err != nil {
+		fatalf("%v", err)
+	}
+	h := &harness{config: *config, retries: *retries, wait: *wait, timeout: *timeout, keep: *keep, etherscan: cfg.Etherscan.APIKey != ""}
 	if err := h.main(dir, *out, *skills, filter); err != nil {
 		fatalf("%v", err)
 	}
@@ -122,6 +138,9 @@ type harness struct {
 	timeout time.Duration
 	// keep is whether to keep the earlier results of the vectors that aren't run.
 	keep bool
+	// etherscan is whether the configuration has an Etherscan API key, without
+	// which the optional explorer commands of the playbooks are skipped.
+	etherscan bool
 }
 
 func (h *harness) main(dir, out, skills string, filter *regexp.Regexp) error {
@@ -264,8 +283,8 @@ func (h *harness) vector(path, name, dir string, books []playbooks.Playbook) (*v
 				continue
 			}
 			ran[key] = true
-			if slices.Contains(oracleCommands, args[0]) {
-				r.Commands = append(r.Commands, vector.Command{Playbook: book.Name, Line: line, Status: vector.CommandSkipped, Error: "it needs the oracle request, which a vector doesn't have"})
+			if reason := h.skip(args[0]); reason != "" {
+				r.Commands = append(r.Commands, vector.Command{Playbook: book.Name, Line: line, Status: vector.CommandSkipped, Error: reason})
 				continue
 			}
 			runs, reason := o.fill(args, requestFile)
@@ -294,6 +313,18 @@ func (h *harness) vector(path, name, dir string, books []playbooks.Playbook) (*v
 		}
 	}
 	return r, nil
+}
+
+// skip returns why a playbook's command doesn't run on a vector, or "" if it
+// runs.
+func (h *harness) skip(command string) string {
+	switch {
+	case command == explorerCommand && !h.etherscan:
+		return "Etherscan not configured: the optional explorer commands need an Etherscan API key, so their evidence is a gap"
+	case slices.Contains(oracleCommands, command):
+		return "it needs the oracle request, which a vector doesn't have"
+	}
+	return ""
 }
 
 // run runs arbot with args, with the harness's configuration, and runs it again
@@ -326,7 +357,7 @@ func (h *harness) run(book string, args []string) (vector.Command, []byte) {
 		}
 		c.Status, c.Error = vector.CommandFailed, errText
 		contains := func(p string) bool { return strings.Contains(errText, p) }
-		transient := contains(transientHint) || slices.ContainsFunc(serviceFailures, contains)
+		transient := contains(transientHint) || contains(etherscanHint) || slices.ContainsFunc(serviceFailures, contains)
 		c.NodeError = transient || slices.ContainsFunc(prunedState, contains)
 		if !transient || try == h.retries {
 			return c, stdout.Bytes()

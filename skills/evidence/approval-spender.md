@@ -19,6 +19,9 @@ For R-4.4, a transaction is insecure if it grants spend authority, operator righ
 5. **What the grant does**: `arbot simulate -json -call <n> -request-file <request.json>`, for the `<n>`th call of `arbot calls`, or `arbot simulate -json -all -trace -request-file <request.json>` for a batch or a delegate call.
    - Shows: whether the call returns or reverts on the state at `safeBlock`, its decoded outputs, and with `-trace`, the calls that it makes.
    - Can't show: the allowance after the call, since a simulation has no effects to read back, or the call's effects in a later block.
+6. **Optional, with an Etherscan key: each spender's deployer, age, and own history**: `arbot explorer creation -json -request-file <request.json> <spender>` and `arbot explorer txs -json -request-file <request.json> <spender>`.
+   - Shows: from Etherscan (offchain, § 3.4, with its `url`, `observedAt`, and `confirmedOnchain`), up to `safeBlock`: a contract spender's creator, factory, creation transaction, and block, confirmed onchain if `confirmedOnchain` is `true`, and the spender's transactions with accounts other than the Safe, which aren't confirmed onchain.
+   - Can't show: labels, internal calls, or more than 10,000 results, so a `capped` listing is incomplete. Without an Etherscan key, the commands fail: record the spender's creator, age, and history as a gap, "Etherscan not configured".
 
 ## Facts to Record
 
@@ -35,3 +38,4 @@ For R-4.4, a transaction is insecure if it grants spend authority, operator righ
 - Approvals signed offchain, such as permits.
 - The nature and scale of the interaction beyond the purpose and the Safe's history, and standard user behavior (§ 2.5, § 2.9).
 - Public labels or flags on a spender (§ 2.7, § 3.4), which no `arbot` command reports.
+- A spender's creator, age, and own history, unless an Etherscan key is configured (step 6): without one, record them as "Etherscan not configured".

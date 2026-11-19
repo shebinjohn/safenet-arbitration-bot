@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/playbooks"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
 )
 
@@ -71,5 +72,36 @@ func TestFill(t *testing.T) {
 	}
 	if !json.Valid([]byte(calls)) {
 		t.Fatal("the calls aren't JSON")
+	}
+}
+
+// TestSkipExplorer checks that the playbooks' optional explorer commands, which
+// need an Etherscan API key, are skipped without one, so that a run without a
+// key doesn't fail on them, and run with one.
+func TestSkipExplorer(t *testing.T) {
+	books, err := playbooks.Load("../../../skills/evidence")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var explorer []string
+	for _, book := range books {
+		for _, line := range book.Commands {
+			if args := strings.Fields(strings.TrimPrefix(line, "arbot ")); args[0] == explorerCommand {
+				explorer = append(explorer, line)
+			}
+		}
+	}
+	if len(explorer) == 0 {
+		t.Fatal("the playbooks run no explorer command")
+	}
+	without, with := &harness{}, &harness{etherscan: true}
+	if reason := without.skip(explorerCommand); !strings.Contains(reason, "Etherscan not configured") {
+		t.Errorf("without a key: got %q, want the explorer commands skipped", reason)
+	}
+	if reason := with.skip(explorerCommand); reason != "" {
+		t.Errorf("with a key: got %q, want the explorer commands run", reason)
+	}
+	if with.skip("status") == "" || with.skip("calls") != "" {
+		t.Errorf("got status skipped %q and calls skipped %q; want only status skipped", with.skip("status"), with.skip("calls"))
 	}
 }

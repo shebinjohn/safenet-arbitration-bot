@@ -20,6 +20,9 @@ For R-4.6: a transaction is insecure if it interacts with an address or contract
    - Shows: the Safe's earlier executions that call the same contracts or pass the same addresses, with their decoded calls, and the events that an earlier transaction logged, decoded if they are well-known (onchain, § 2.8). Any contract can log a well-known event, so the emitter matters.
    - Can't show: other accounts' use of the targets, and events that aren't well-known, which are printed undecoded.
 6. **Token flows**: `arbot transfers -all -json -request-file <request.json>` and `arbot transfers -all -in -json -request-file <request.json>`, when the case turns on what moved between the Safe and a target, as the [`value-recipient`](value-recipient.md) playbook describes them.
+7. **Optional, with an Etherscan key: each target's deployer and age**: `arbot explorer creation -json -request-file <request.json> <address>`, and `arbot explorer source -json -request-file <request.json> <address>` for a second record of its verification, next to Sourcify's, for each target that isn't the Safe or a § 2.1 contract.
+   - Shows: from Etherscan (offchain, § 3.4, with its `url`, `observedAt`, and `confirmedOnchain`): the target's creator, factory, creation transaction, and block, confirmed onchain if `confirmedOnchain` is `true`, which give its age at `safeBlock`, and whether Etherscan has verified its source, with its name and compiler, and reads it as a proxy, with its implementation.
+   - Can't show: labels or security flags (§ 2.7), which Etherscan's free plan doesn't have; that the factory deployed it, which a receipt doesn't say; or when Etherscan verified the source, so a verification after the proposal is later evidence (§ 3.6). A creation with `afterCutoff` isn't evidence. Without an Etherscan key, the commands fail: record the creator and age as a gap, "Etherscan not configured".
 
 ## Facts to Record
 
@@ -34,5 +37,5 @@ Record these whenever they apply:
 
 - **No public security flags checked (§ 2.7): no trusted provider is integrated; the Council checks them by hand.** Record this gap in every R-4.6 case, for every target, as decisive: a reliable flag would change the verdict, and the absence of a checked flag is not evidence that there is none. A summary with it has `humanReview` set to `true`.
 - The runtime code of each contract that the transaction creates, and what it does: no `arbot` command decodes init code or shows the code that it deploys. Record it as decisive when the created contract receives value, permissions, or control.
-- The creator, creation transaction, and age of each target that isn't the Safe.
+- The creator, creation transaction, and age of each target that isn't the Safe, unless an Etherscan key is configured (step 7): without one, record it as "Etherscan not configured".
 - Calls to view functions that the transaction doesn't make, such as a contract's `owner()`.

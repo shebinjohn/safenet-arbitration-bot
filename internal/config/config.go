@@ -42,6 +42,21 @@ type Config struct {
 	// Oracle is the address of the SentinelOracle contract on Gnosis Chain to read
 	// Safenet requests from. If zero, the default deployment is used.
 	Oracle ethrpc.Address `json:"oracle"`
+	// Etherscan is the Etherscan API that the optional explorer commands read. It
+	// has no default key, so those commands fail without one, and no other command
+	// needs it.
+	Etherscan Etherscan `json:"etherscan"`
+}
+
+// Etherscan is the configuration of the Etherscan API.
+type Etherscan struct {
+	// APIKey is the key that the API needs for every request. It is a secret: it is
+	// never printed, and only sent to URL.
+	APIKey string `json:"apiKey"`
+	// URL is the URL of Etherscan's multichain API, which takes the chain ID as a
+	// query parameter. If empty, Etherscan's V2 API,
+	// "https://api.etherscan.io/v2/api", is used.
+	URL string `json:"url"`
 }
 
 // Load reads the configuration file at path. If path is empty, it uses the

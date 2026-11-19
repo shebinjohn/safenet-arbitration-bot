@@ -1,7 +1,7 @@
 # Draft Ruling: Request {{short-id}}
 
 <!--
-Fill in every {{placeholder}} and follow the instructions in these comments, then delete the comments. Take every value from the request file, `arbot` output, the Charter, or the accepted case, never from memory. Link every transaction, address, and block to the block explorer of its chain, and give a hash or address without a link if its chain has no explorer in the skill.
+Fill in every {{placeholder}} and follow the instructions in these comments, then delete the comments. Take every value from the request file, `arbot` output, the evidence summary, the Charter, or the accepted case, never from memory, and copy it as the source writes it: `arbot check-report` checks each one. Mark a number that you compute as derived, with `about` or `~` right before it, or `derived` on its line. Link every transaction, address, and block to the block explorer of its chain, and give a hash or address without a link if its chain has no explorer in the skill.
 -->
 
 > **Draft for Security Council review.** This report was drafted by `arbot` and its agents. It is not a ruling, and nothing has been submitted onchain. The Council reviews it and rules through the Arbitrator Safe.
@@ -18,6 +18,7 @@ If no case was accepted, replace the note above with this one:
 
 - **Decided by**: {{"`arbot classify`: <description>", "the `prosecutor`'s case, accepted by the `judge` in round <n>", or "no accepted case"}}
 - **Reason**: {{one to three sentences: the rule, the fact that decides it, and why no exception applies}}
+- **Human review**: {{"required", with the `humanReviewReasons` of `evidence-summary.json`, if its `humanReview` is true, or "not flagged"}}. Evidence uncertainty: {{the summary's `uncertainty`, and its reason, or "none, classified" for a classified request}}
 - **Onchain action**: `{{resolveDispute(<request-id>, false, context) for insecure, or resolveDispute(<request-id>, true, context) for secure}}`, by Gnosis Chain block {{deadline}}
 
 ## Request
@@ -110,7 +111,7 @@ Every transaction that the material evidence cites, and the accounts that the tr
 Each past ruling that the case applied or distinguished, by request ID, with its outcome and how it bears on this request, or "Novel fact pattern" and the analogy that the case reasons by (§ 5.1). For a deterministic classification, write "None: the rule applies directly."
 -->
 
-- `{{request-id}}` ({{outcome}}): {{applied or distinguished}}, because {{reason}}
+- `{{request-id}}` ({{outcome, as its corpus file's header has it}}): {{applied or distinguished}}, because {{reason}}
 
 ## Sentinel Votes
 
@@ -123,7 +124,7 @@ Their reasons decide the disputed rules, but they aren't evidence (§ 2.14).
 ## Weaknesses and Gaps
 
 <!--
-The case's Weaknesses, the gaps in the `detective` report that bear on the verdict and the `arbot` command that would fill each one, and any doubts that the `judge` raised. For a deterministic classification, write "None".
+The case's Weaknesses, the gaps of the evidence summary that bear on the verdict, marking those that are decisive, and the `arbot` command that would fill each one, the conflicts between sources, and any doubts that the `judge` raised. For a deterministic classification, write "None".
 -->
 
 - {{weakness or gap}}
@@ -160,3 +161,4 @@ The files in the arbitration directory, and how the verdict was reached.
 - **Classification**: `{{arbot classify output}}`
 - **Rounds**: {{evidence rounds}} evidence, {{oversight rounds}} oversight, {{judge rounds}} judge
 - **Final files**: {{`case-<n>.md`, `oversight-<n>.md`, `judgment-<n>.md`}}
+- **Report check**: {{"`arbot check-report`: no findings", or each finding that remains, with its line and kind and why it stands}}

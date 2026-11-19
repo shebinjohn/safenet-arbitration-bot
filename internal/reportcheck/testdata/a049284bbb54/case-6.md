@@ -1,0 +1,60 @@
+# Case (run 6): request 0xa049284bbb5473c8994e5160c9006c60a4d651545b8d09990581f6d92d1b0f27
+
+## Verdict
+
+`insecure` under `R-4.3` (value sent to a recipient outside the expected target set, § 2.4), resting on a principle-based finding under § 3.7. The case does not rest on § 3.8.
+
+## Request
+
+- Safe `0xc4994fe4f501a02434ca7f25b14fd803f5d7a388` on Ethereum Mainnet (chain ID 1), nonce 17, proposed 2026-11-10T01:26:25Z, `safeBlock` 26381211.
+- Request ID `0xa049284bbb5473c8994e5160c9006c60a4d651545b8d09990581f6d92d1b0f27`, `FROZEN`.
+- Charter `charter.safenet-gov.eth`, CID `bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre`.
+- Disputed rule: R-4.3, cited by `0x6d081448c04d9ef7cf8ecf54207b1931ecc25312` (`DENIED`, reason `R-4.3`). Two other sentinels voted `APPROVED` with empty reasons. Votes are not evidence (§ 2.14).
+
+## Argument
+
+1. The Safe is a § 2.1 Safe: `arbot calls` identifies it as a proxy of version 1.4.1 with singleton `0x41675c099f32341bf84bfc5382af534df5c7461a`, singleton version 1.4.1. Only R-4.3 is disputed, so only it is considered.
+2. The transaction is one CALL, value 0, to token `0xdac17f958d2ee523a2206206994597c13d831ec7`, with `transfer(0xc01ea83bacda63097627f45d987684569fdceae5, 10000000)`, no refund, no batch. The account that `transfer` names receives the tokens, so it is the target address under § 2.4 ("the address that receives value or tokens"), and the token contract is only an intermediate contract. This is a value transfer that R-4.3 tests, as in `0xce3b5448…` and `0x6652ef59…`.
+3. R-4.3 asks whether the recipient is inside the expected target set, the set consistent with the Safe's established onchain pattern (§ 2.4), considering prior history, protocol-recorded purpose (§ 2.11), and standard user behavior (§ 2.9). A new address is not automatically outside it, so the question is what places this one inside.
+4. Nothing in the evidence does:
+   - It is not an owner (owners are `0x0cf77778…`, `0x66cd5fa0…`, `0x0ae40c60…`, threshold 2) and the Safe has no modules.
+   - It has no code as of `safeBlock` (code size 0, `no-code`), so it is not a Safe or a contract of a § 2.1 version.
+   - In the Safe's executed Safe transactions at nonces 0 to 16 (Safe Transaction Service, an offchain source observed 2026-11-10T10:08:01Z, each confirmed onchain by `arbot`, no missing nonces), it is never the target, a recipient, or an approved spender of any decoded call.
+   - In whole-history scans of blocks 25381212 to 26381211 (1,000,000 blocks up to `safeBlock`, starting 87,853 blocks before the Safe's first execution at block 25469065), there is no ERC-20 or native transfer from it into the Safe, and, apart from the transaction's own execution, no ERC-20 transfer from the Safe to it.
+   - `oracleData` is `0x`, so no purpose is recorded (§ 2.11).
+   - The report has no evidence of any link, label, or legitimate history for it.
+5. The depth of this search matches that of the ruling that I follow. `0xce3b5448…` searched 1,000,000 blocks, as here. The one inbound fact that `0x586a2ed7…` treated as decisive, that the recipient had earlier sent the Safe funds, is searched here over the same 1,000,000 blocks and over the Safe's whole recorded execution history (nonces 0 to 16), and is not found. What remains unsearched is the period before block 25381212, which is the gap that I name below. For that period the case does not claim that there is no such payment. It rests on the fact that the admissible evidence before the Council shows none, over a window that reaches back past the Safe's first execution, and the Council can only rule on admissible evidence (§ 3.3 to § 3.5). If a payment from the recipient before block 25381212 is shown, the recipient is inside the set under `0x586a2ed7…`, and the verdict would change to `secure`.
+6. R-4.3's factors for a novel recipient: (a) there is no recorded purpose or onchain history of the recipient to be consistent with; (b) the report has no evidence on address poisoning, so this factor gives the recipient nothing; (c) there is no admissible evidence of what standard users would do (§ 2.9, a gap). Nothing is shown to favor the recipient.
+7. The strongest argument for `secure` is the Safe's own pattern. The Safe paid exactly 10000000 at nonces 0, 1, 3, 5, and 6, the same amount as this transfer:
+   - nonce 0, on `0xa0b86991…eb48`, to the owner `0x66cd5fa0…`, which received nothing more from the Safe in the scanned range;
+   - nonce 1, on `0xdac17f95…1ec7` (the token of this transfer), to `0x41656ccf…`, which was paid 59173220000 at nonce 2;
+   - nonce 3, on `0xa0b86991…eb48`, to `0xe408d476…`, which was paid 49990000000 at nonce 4;
+   - nonces 5 and 6, on `0xdac17f95…1ec7`, to `0x799973cc…` and `0xa73dc770…`, which were paid 19990000000 and 1490000000 at nonces 13 and 14.
+   So the Safe has repeatedly paid a new recipient a small amount, then a larger one, and this transfer can be read as the first step of that shape. But that shows how the Safe has treated new recipients, not a link between the Safe and this account. In `0xce3b5448…` the Council held that "the Safe's earlier payments to other new accounts don't make this one expected", and that a new recipient is admitted on concrete proof that it can be trusted, such as being an owner or having sent the Safe funds. `0x6652ef59…` held the same. If a habit of paying small amounts first made a new recipient expected, every unlinked address would be inside the set for a first small payment, and R-4.3 would not apply to it. The small amount shows less value at risk, not a recipient inside the set. A later payment to this recipient cannot be used (§ 3.6), and the execution at block 26381211 is the transaction itself and was excluded.
+8. The finding is therefore that the recipient is outside the expected target set. It is a reasonable, evidence-grounded finding (§ 3.7, § 3.8): it is defensible by reference to admissible evidence (the Safe's history and the recipient's state as of `safeBlock`), and to this Charter's rule and the Council's own reading of § 2.4. The case does not claim that the evidence is evenly balanced. The evidence against the recipient is a set of absences, which § 3.8 says is not determinative alone, so the finding rests on the Council's reading of § 2.4 in `0xce3b5448…`, under which a new recipient needs positive proof that it belongs, and none is shown. Nothing in the report weighs for the recipient other than the Safe's amount pattern, which step 7 answers.
+
+## Material evidence
+
+- The Safe is a proxy of version 1.4.1 with singleton `0x41675c09…` of version 1.4.1 (`arbot calls`).
+- One call: `transfer(0xc01ea83b…eae5, 10000000)` on `0xdac17f95…1ec7`, value 0, CALL, no refund (`arbot calls`). The token's symbol and decimals are not reported.
+- Recipient: no code as of 26381211, not an owner, not a module; owners 3, threshold 2, no modules (`arbot signatures`, `arbot safe`).
+- Executed Safe transactions at nonces 0 to 16 never involve the recipient as target, recipient, or spender (`arbot history`, Safe Transaction Service, observed 2026-11-10T10:08:01Z, each confirmed onchain, no missing nonces).
+- In blocks 25381212 to 26381211 (`arbot transfers -in -from`, `arbot transfers -to`, mevblocker RPC, first attempt): no transfer from the recipient into the Safe, ERC-20 or native, and no ERC-20 transfer from the Safe to it apart from the transaction's own execution. The range starts 87,853 blocks before the first execution (nonce 0, block 25469065). `-to` scans list ERC-20 events only.
+- The earlier 10000000 payments: nonce 0, `0xa0b8…eb48`, to the owner `0x66cd5fa0…` (which got no other transfer from the Safe in the range, and is not otherwise a target in nonces 1 to 16); nonce 1, `0xdac1…1ec7`, to `0x41656ccf…`; nonce 3, `0xa0b8…eb48`, to `0xe408d476…`; nonces 5 and 6, `0xdac1…1ec7`, to `0x799973cc…` and `0xa73dc770…`. Later larger payments to the nonce 1, 3, 5, and 6 recipients: nonces 2 (59173220000), 4 (49990000000), 13 (19990000000), and 14 (1490000000). So three of the five (nonces 1, 5, 6) were on the same token as this transfer, and two (nonces 0, 3) on another token.
+- `oracleData` is `0x`. The execution at block 26381211 is the effect of the transaction itself and was not used (§ 3.6).
+
+## Precedents
+
+- Applied: `0xce3b54488bb44619c7b5d6deee37837b0c0a7d3c3e5a6ce47c1bd7f6bf8fc41e` (ERC-20 transfer to a codeless, non-owner account with no interaction and no purpose; the Safe's payments to other new accounts don't make it expected; insecure) and `0x6652ef59f0d6407810cb3e7b9baead7722e2cfa4daa6f27a2dfc22b5eb58912b` (same holding).
+- Applied by analogy: `0x844fe527e82fbf88b70e05db4c487de8143ca5d3b97e2eca24f6348c4d894434` and `0x077791fe52b006b7440aaccb4240ee043a64862aa4dc299632905559541e08be` (native value, codeless non-owner recipient; insecure), and `0x5a5a248f863ab189d8170147aee52b8cb6203f592996ef19793e7c040165b31e` (codeless recipient, no history; insecure).
+- Distinguished: `0x298149bb3e95eb950dfb281185f338dcf91f1d3585ad9c6ec22ace33b668c7e3` (the recipient was an owner; here it is not), `0x586a2ed7fc5cbbe9043a34fb9d9d81a7f46b66740a84767c8515b782b97cf6eb` (secure; the recipient had earlier sent the Safe 1,665,960 USDC.e and had the Safe's own proxy code hash; here no payment from it is shown in the scanned range and it has no code), and `0xd0040a42d9ff1cb18e53ccb27acf7e79022eb36f052ee0d731c05db040c675a9` and `0x5d05c97126068fef0018afdb623304f6501e7e954dea42c0b8ec8aba8faa957d` (the same recipient had been paid before; here it was not, in nonces 0 to 16 and the scans). `0x5d05c971…` also held that missing purpose and recipient history do not make the evidence evenly balanced against positive evidence for the recipient, which is why this case does not use § 3.8.
+- Novel: the matching amount. The Safe's repeated 10000000 first payments are not covered by a ruling that I read, though `0xce3b5448…` flagged for SafeDAO the question of whether a Safe's history of paying new accounts can place a new, unlinked recipient inside the set. It is reasoned by analogy (§ 5.1) and may be flagged again.
+
+## Weaknesses
+
+- **Gap that could change the verdict.** The Safe's creation block and first funding block are not available (`arbot` has no command for them). The scans start at block 25381212. A payment from the recipient into the Safe before then, or a token movement by an allowance, is not excluded. Such a payment would place the recipient inside the set as in `0x586a2ed7…`, and the verdict would be `secure`. With the creation block, if it were at or after 25381212, the search would cover the Safe's whole life and the finding in step 4 would be complete. If a payment were found, the case would change to `secure`. The window reaches 87,853 blocks before the first execution and matches the depth of `0xce3b5448…`, but it is not shown to cover the Safe's lifetime.
+- **The pattern of small first payments.** The Safe paid exactly this amount to new recipients five times, and four of them were later paid more, three of those with this same token. A Council that reads that as the Safe's "established onchain pattern" could find the recipient inside the set. I argue it does not (step 7), following `0xce3b5448…` and `0x6652ef59…`, but the amount match is not in those rulings.
+- The evidence against the recipient is absences only (no link, history, purpose, or evidence on poisoning or standard behavior). § 3.8 says absence of evidence is not determinative alone, so the verdict depends on the Council's reading of § 2.4 that a new recipient needs positive proof. If the Council reads it differently, the verdict could be `secure`, as in `0x586a2ed7…`.
+- The token's symbol and decimals are not reported (gap), so the real size of 10000000 is unknown.
+- No evidence on the recipient's own history, labels, scam flags, or address-poisoning resemblance, nor on standard user behavior (gaps). Native currency and ERC-721 transfers out of the Safe are not listed by `arbot transfers`.
+- The Transaction Service is an offchain source for the history, though `arbot` confirms each transaction onchain.

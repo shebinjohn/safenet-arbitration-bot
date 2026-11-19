@@ -32,6 +32,7 @@ var commands = map[string]struct {
 	"account":         {accountCommand, "show an account on the Safe's chain of a Safenet request, such as a recipient or a token"},
 	"calls":           {callsCommand, "list the calls that the Safe of a Safenet request makes, as the checks judge them"},
 	"charter":         {charter, "fetch the Safenet Arbitration Charter"},
+	"check-report":    {checkReport, "check the values of a draft ruling against the files of its arbitration"},
 	"events":          {eventsCommand, "list the events that a transaction logged, on the Safe's chain of a Safenet request"},
 	"executions":      {executionsCommand, "list the Safe transactions that the Safe of a Safenet request executed"},
 	"contract-source": {contractSourceCommand, "print the source code of a contract on the Safe's chain of a Safenet request"},

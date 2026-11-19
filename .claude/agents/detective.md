@@ -1,6 +1,6 @@
 ---
 name: detective
-description: Collects the evidence for a disputed Safenet request under its disputed rules with `arbot` commands, citing the Charter rules each fact bears on, and lists the evidence that `arbot` cannot provide yet. Use it before drafting a ruling, instead of reading chains in the main context. Pass it the path of the request that `arbot info -json` wrote, the paths of the disputed rules, the Charter summary and the full Charter, and the path to write the report to, and for a follow-up, the `prosecutor`'s evidence requests or the `oversight` findings.
+description: Collects the evidence for a disputed Safenet request under its disputed rules with `arbot` commands, following the `evidence` playbooks, citing each fact's source, block, and the Charter rules it bears on, lists the evidence that `arbot` cannot provide yet, and writes an evidence summary with the uncertainty and a suggested ruling. Use it before drafting a ruling, instead of reading chains in the main context. Pass it the paths of the request that `arbot info -json` wrote, its status and classification, the disputed rules, the Charter summary and the full Charter, the playbooks to follow, and the paths to write the report and the evidence summary to, and for a follow-up, the `prosecutor`'s evidence requests or the `oversight` findings.
 tools: Read, Write, Bash
 model: sonnet
 effort: medium

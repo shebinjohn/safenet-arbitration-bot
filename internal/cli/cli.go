@@ -29,6 +29,7 @@ var commands = map[string]struct {
 	run         func(ctx context.Context, e *env, args []string) error
 	description string
 }{
+	"account":         {accountCommand, "show an account on the Safe's chain of a Safenet request, such as a recipient or a token"},
 	"calls":           {callsCommand, "list the calls that the Safe of a Safenet request makes, as the checks judge them"},
 	"charter":         {charter, "fetch the Safenet Arbitration Charter"},
 	"events":          {eventsCommand, "list the events that a transaction logged, on the Safe's chain of a Safenet request"},
@@ -38,7 +39,7 @@ var commands = map[string]struct {
 	"index":           {indexCommand, "index the arbitrator's rulings into the rulings corpus"},
 	"info":            {info, "show a Safenet request, its proposal, votes, and arbitration"},
 	"pending":         {pending, "list the disputed Safenet requests awaiting arbitration"},
-	"safe":            {safeCommand, "show the settings of the Safe of a Safenet request"},
+	"safe":            {safeCommand, "show the settings of the Safe of a Safenet request, or of another account, or compare them"},
 	"signatures":      {signaturesCommand, "list the functions of a contract on the Safe's chain of a Safenet request"},
 	"tags":            {tags, "list the tags of a ruling in the rulings corpus"},
 	"transfers":       {transfers, "list the transfers out of, or into, the Safe of a Safenet request"},

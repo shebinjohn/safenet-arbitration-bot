@@ -11,6 +11,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 )
 
 const (
@@ -68,6 +71,10 @@ func receiptNode(t *testing.T, receipts map[string]any) string {
 			res["result"] = "0x1"
 		case "eth_getTransactionReceipt":
 			res["result"] = receipts[req.Params[0]]
+		case "eth_getBlockByNumber":
+			var number ethrpc.BlockNumber
+			number.UnmarshalText([]byte(req.Params[0]))
+			res["result"] = fakeHeader(number)
 		default:
 			res["error"] = map[string]any{"code": -32601, "message": "method not found"}
 		}
@@ -106,6 +113,7 @@ func TestEvents(t *testing.T) {
 		}
 		var got struct {
 			ChainID, SafeBlock, Block uint64
+			BlockTime                 time.Time
 			TxHash, Status            string
 			Events                    []struct {
 				LogIndex uint64
@@ -123,7 +131,8 @@ func TestEvents(t *testing.T) {
 		if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 			t.Fatalf("decoding %s: %v", stdout, err)
 		}
-		if got.ChainID != 1 || got.SafeBlock != 100 || got.Block != 100 || got.Status != "success" || !strings.EqualFold(got.TxHash, txSuccess) || len(got.Events) != 2 {
+		if got.ChainID != 1 || got.SafeBlock != 100 || got.Block != 100 || !got.BlockTime.Equal(fakeBlockTime(100)) || got.Status != "success" ||
+			!strings.EqualFold(got.TxHash, txSuccess) || len(got.Events) != 2 {
 			t.Fatalf("events: got %+v", got)
 		}
 		transfer := got.Events[0].Event
@@ -145,7 +154,7 @@ func TestEvents(t *testing.T) {
 			t.Fatalf("events: status %d, stderr %q", code, stderr)
 		}
 		for _, want := range []string{
-			`(?m)^Transaction ` + txSuccess + ` on chain 1, in block 100 \(success\)$`,
+			`(?m)^Transaction ` + txSuccess + ` on chain 1, in block 100 at ` + fakeBlockTime(100).Format(time.RFC3339) + ` \(success\)$`,
 			`(?m)^Log 0, emitted by 0x[0-9a-fA-F]{38}[cC]3$`,
 			`(?m)^  Event  Transfer\(address,address,uint256\)$`,
 			`(?m)^    value = 7$`,
@@ -187,5 +196,43 @@ func TestEvents(t *testing.T) {
 					test.args, code, stdout, stderr, test.code, test.stderr)
 			}
 		})
+	}
+}
+
+// TestEventsBlockTimeTransient checks that a block time that the node fails to
+// serve fails the command, rather than being left out.
+func TestEventsBlockTimeTransient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     uint64   `json:"id"`
+			Method string   `json:"method"`
+			Params []string `json:"params"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		res := map[string]any{"jsonrpc": "2.0", "id": req.ID}
+		switch req.Method {
+		case "eth_chainId":
+			res["result"] = "0x1"
+		case "eth_getTransactionReceipt":
+			res["result"] = receipt(txSuccess, 100, "0x1")
+		default:
+			http.Error(w, "overloaded", http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(res)
+	}))
+	t.Cleanup(server.Close)
+	config := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(config, fmt.Appendf(nil, `{"rpcs": {"1": %q}}`, server.URL), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	request := filepath.Join(t.TempDir(), "request.json")
+	if err := os.WriteFile(request, []byte(`{"proposal": {"safeBlock": 100, "transaction": {"chainId": 1}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := Run(t.Context(), []string{"arbot", "-config", config, "events", "-json", "-request-file", request, txSuccess}, &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "reading the time of block 100") || !strings.Contains(stderr.String(), "run the command again later") {
+		t.Errorf("events: got status %d, stderr %q; want 1, and that the block time failed transiently", code, stderr.String())
 	}
 }

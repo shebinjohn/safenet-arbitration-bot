@@ -91,12 +91,12 @@ func (d *decoder) decodeSources(ctx context.Context, i int) (Source, *safenet.Sa
 	}
 
 	if d.Service != nil {
-		tx, err := d.Service.Transaction(ctx, e.SafeTxHash)
+		x, err := d.Service.Transaction(ctx, e.SafeTxHash)
 		if err != nil && !errors.Is(err, txservice.ErrNotFound) {
 			d.warn(fmt.Errorf("getting Safe transaction %s from the Safe Transaction Service: %w", e.SafeTxHash, err))
 		}
-		if err == nil && matches(tx, e.SafeTxHash) {
-			return SourceService, tx
+		if err == nil && matches(x.Transaction, e.SafeTxHash) {
+			return SourceService, x.Transaction
 		}
 	}
 	return "", nil

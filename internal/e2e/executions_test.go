@@ -295,7 +295,7 @@ func TestExecutions(t *testing.T) {
 			`(?m)^Safe transactions executed by ` + safe.String() + ` on chain 1, up to block \d+$`,
 			`(?m)^Nonce at block \d+: 4 \(complete\)$`,
 			fmt.Sprintf(`(?m)^Scanned blocks %d to %d for executions that the service doesn't list$`, viaCalldata.Block, failed.Block),
-			`(?m)^\d+ +` + viaTrace.TxHash.String() + ` +success +` + viaTrace.SafeTxHash.String() + ` +trace +1 +`,
+			`(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + viaTrace.TxHash.String() + ` +success +` + viaTrace.SafeTxHash.String() + ` +trace +1 +`,
 		} {
 			if !regexp.MustCompile(want).Match(text) {
 				t.Errorf("executions -all: output has no line matching %q:\n%s", want, text)
@@ -315,9 +315,9 @@ func TestExecutions(t *testing.T) {
 		text := arbot.Run(t, "executions", "-request-file", path)
 		for _, want := range []string{
 			`(?m)^Safe transactions executed by ` + safe.String() + ` on chain 1, in blocks 0 to \d+$`,
-			`(?m)^\d+ +` + viaCalldata.TxHash.String() + ` +success +` + viaCalldata.SafeTxHash.String() + ` +calldata +0 +` + target.String() + ` +0 +CALL +0x1234 \(2 bytes\)$`,
-			`(?m)^\d+ +` + viaTrace.TxHash.String() + ` +success +` + viaTrace.SafeTxHash.String() + ` +trace +1 +`,
-			`(?m)^\d+ +` + failed.TxHash.String() + ` +failure +` + failed.SafeTxHash.String() + ` +calldata +2 +` + reverter.String() + ` +0 +CALL +-$`,
+			`(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + viaCalldata.TxHash.String() + ` +success +` + viaCalldata.SafeTxHash.String() + ` +calldata +0 +` + target.String() + ` +0 +CALL +0x1234 \(2 bytes\)$`,
+			`(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + viaTrace.TxHash.String() + ` +success +` + viaTrace.SafeTxHash.String() + ` +trace +1 +`,
+			`(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + failed.TxHash.String() + ` +failure +` + failed.SafeTxHash.String() + ` +calldata +2 +` + reverter.String() + ` +0 +CALL +-$`,
 		} {
 			if !regexp.MustCompile(want).Match(text) {
 				t.Errorf("executions: output has no line matching %q:\n%s", want, text)
@@ -383,7 +383,7 @@ func TestExecutionsUnknown(t *testing.T) {
 	}
 
 	text := arbot.Run(t, "executions", "-request-file", path)
-	line := `(?m)^\d+ +` + receipt.TransactionHash.String() + ` +success +` + tx.Hash().String() + ` +- +unknown transaction$`
+	line := `(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + receipt.TransactionHash.String() + ` +success +` + tx.Hash().String() + ` +- +unknown transaction$`
 	if !regexp.MustCompile(line).Match(text) {
 		t.Errorf("executions: output has no line matching %q:\n%s", line, text)
 	}

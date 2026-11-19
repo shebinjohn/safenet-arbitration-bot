@@ -8,6 +8,7 @@ import (
 	"maps"
 	"math/big"
 	"slices"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -342,8 +343,11 @@ var proxyCreationEvent = solabi.Event("ProxyCreation(address,address)")
 type Creation struct {
 	// Block is the block whose transaction gave the account its code: it has no
 	// code at the block before, and has code at Block.
-	Block  uint64      `json:"block"`
-	TxHash ethrpc.Hash `json:"txHash"`
+	Block uint64 `json:"block"`
+	// BlockTime is the timestamp of Block, which the caller sets with ethrpc's
+	// BlockTime, or zero if it isn't read.
+	BlockTime time.Time   `json:"blockTime,omitzero"`
+	TxHash    ethrpc.Hash `json:"txHash"`
 	// Factory is the contract that logged the ProxyCreation event of the account in
 	// the transaction, or nil if none did.
 	Factory *ethrpc.Address `json:"factory"`

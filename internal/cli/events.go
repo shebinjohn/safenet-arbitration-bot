@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/events"
@@ -16,6 +17,8 @@ type eventsReport struct {
 	SafeBlock uint64      `json:"safeBlock"`
 	TxHash    ethrpc.Hash `json:"txHash"`
 	Block     uint64      `json:"block"`
+	// BlockTime is the timestamp of Block.
+	BlockTime time.Time `json:"blockTime"`
 	// Status is "success", or "reverted" for a transaction that has no events.
 	Status string         `json:"status"`
 	From   ethrpc.Address `json:"from"`
@@ -79,8 +82,12 @@ func eventsCommand(ctx context.Context, e *env, args []string) error {
 		return fmt.Errorf("transaction %s is in block %d of chain %d, after the request's Safe block %d", hash, receipt.BlockNumber, safe.ChainID, safe.SafeBlock)
 	}
 
+	blockTime, err := safe.eth.BlockTime(ctx, receipt.BlockNumber)
+	if err != nil {
+		return fmt.Errorf("reading the time of block %d: %w", receipt.BlockNumber, err)
+	}
 	report := eventsReport{
-		ChainID: safe.ChainID, SafeBlock: safe.SafeBlock, TxHash: hash, Block: uint64(receipt.BlockNumber),
+		ChainID: safe.ChainID, SafeBlock: safe.SafeBlock, TxHash: hash, Block: uint64(receipt.BlockNumber), BlockTime: blockTime,
 		Status: "reverted", From: receipt.From, To: receipt.To, Events: []eventLog{},
 	}
 	if receipt.Status == 1 {
@@ -95,7 +102,7 @@ func eventsCommand(ctx context.Context, e *env, args []string) error {
 	if *asJSON {
 		return writeJSON(e.stdout, report)
 	}
-	fmt.Fprintf(e.stdout, "Transaction %s on chain %d, in block %d (%s)\n", report.TxHash, report.ChainID, report.Block, report.Status)
+	fmt.Fprintf(e.stdout, "Transaction %s on chain %d, in block %d at %s (%s)\n", report.TxHash, report.ChainID, report.Block, formatTime(report.BlockTime), report.Status)
 	fmt.Fprintf(e.stdout, "  From  %s\n", report.From)
 	if report.To != nil {
 		fmt.Fprintf(e.stdout, "  To    %s\n", report.To)

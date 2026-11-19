@@ -60,13 +60,15 @@ type transfersService struct {
 // the chain's native currency, which has no Token, so that other kinds can be
 // added without changing the others.
 type transfer struct {
-	Type     string          `json:"type"`
-	Block    uint64          `json:"block"`
-	TxHash   ethrpc.Hash     `json:"txHash"`
-	LogIndex uint64          `json:"logIndex"`
-	Token    *ethrpc.Address `json:"token,omitempty"`
-	From     ethrpc.Address  `json:"from"`
-	To       ethrpc.Address  `json:"to"`
+	Type  string `json:"type"`
+	Block uint64 `json:"block"`
+	// BlockTime is the timestamp of Block.
+	BlockTime time.Time       `json:"blockTime"`
+	TxHash    ethrpc.Hash     `json:"txHash"`
+	LogIndex  uint64          `json:"logIndex"`
+	Token     *ethrpc.Address `json:"token,omitempty"`
+	From      ethrpc.Address  `json:"from"`
+	To        ethrpc.Address  `json:"to"`
 	// Value is the amount in the smallest unit of the token or the currency.
 	Value *big.Int `json:"value"`
 }
@@ -227,6 +229,13 @@ func transfers(ctx context.Context, e *env, args []string) error {
 	slices.SortStableFunc(report.Transfers, func(a, b transfer) int {
 		return cmp.Or(cmp.Compare(a.Block, b.Block), cmp.Compare(a.LogIndex, b.LogIndex))
 	})
+	// The client reads each block's time once, for all of the transfers in it.
+	for i := range report.Transfers {
+		t := &report.Transfers[i]
+		if t.BlockTime, err = ref.eth.BlockTime(ctx, ethrpc.BlockNumber(t.Block)); err != nil {
+			return fmt.Errorf("reading the time of block %d: %w", t.Block, err)
+		}
+	}
 
 	if *asJSON {
 		return writeJSON(e.stdout, report)
@@ -256,18 +265,18 @@ func transfers(ctx context.Context, e *env, args []string) error {
 	}
 	w := tabwriter.NewWriter(e.stdout, 0, 0, 2, ' ', 0)
 	if *in {
-		fmt.Fprintln(w, "BLOCK\tTRANSACTION\tTYPE\tTOKEN\tFROM\tVALUE")
+		fmt.Fprintln(w, "BLOCK\tTIME\tTRANSACTION\tTYPE\tTOKEN\tFROM\tVALUE")
 		for _, t := range report.Transfers {
 			token := "-"
 			if t.Token != nil {
 				token = t.Token.String()
 			}
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", t.Block, t.TxHash, t.Type, token, t.From, t.Value)
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n", t.Block, formatTime(t.BlockTime), t.TxHash, t.Type, token, t.From, t.Value)
 		}
 	} else {
-		fmt.Fprintln(w, "BLOCK\tTRANSACTION\tTOKEN\tTO\tVALUE")
+		fmt.Fprintln(w, "BLOCK\tTIME\tTRANSACTION\tTOKEN\tTO\tVALUE")
 		for _, t := range report.Transfers {
-			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", t.Block, t.TxHash, t.Token, t.To, t.Value)
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", t.Block, formatTime(t.BlockTime), t.TxHash, t.Token, t.To, t.Value)
 		}
 	}
 	return w.Flush()

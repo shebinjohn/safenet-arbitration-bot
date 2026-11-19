@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -72,7 +73,7 @@ func historyService(t *testing.T, listings []listing, creation ...ethrpc.Hash) *
 // executed returns what Find reports about an execution of tx in the onchain
 // transaction hash at block, from source.
 func executed(tx *safenet.SafeTransaction, hash ethrpc.Hash, block uint64, source Source) Execution {
-	return Execution{block, hash, 0, tx.Hash(), true, big.NewInt(9), source, tx}
+	return Execution{block, time.Time{}, hash, 0, tx.Hash(), true, big.NewInt(9), source, tx}
 }
 
 // checkExecutions reports the executions in got that differ from want. They are
@@ -401,7 +402,7 @@ func TestFindAllFromCreation(t *testing.T) {
 		t.Fatalf("FindAll: %v", err)
 	}
 	if !got.Complete() || len(got.Executions) != 2 || !reflect.DeepEqual(got.Scanned, []BlockRange{{80, 100}}) ||
-		!reflect.DeepEqual(got.Creation, &Creation{80, hash(7), nil}) {
+		!reflect.DeepEqual(got.Creation, &Creation{80, time.Time{}, hash(7), nil}) {
 		t.Errorf("FindAll: got %+v; want two executions, from scanning blocks 80 to 100, and the creation at block 80", got)
 	}
 }
@@ -511,8 +512,8 @@ func TestCreationFromService(t *testing.T) {
 		want     *Creation
 		warning  string
 	}{
-		{"confirmed", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, &Creation{100, hash(1), &factory}, ""},
-		{"without a log", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): {BlockNumber: 100}}, &Creation{100, hash(1), nil}, ""},
+		{"confirmed", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, &Creation{100, time.Time{}, hash(1), &factory}, ""},
+		{"without a log", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): {BlockNumber: 100}}, &Creation{100, time.Time{}, hash(1), nil}, ""},
 		{"code before", 90, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, nil, "has code at block 99"},
 		{"no code", 0, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): created}, nil, "no code at block 100"},
 		{"later", 100, []ethrpc.Hash{hash(1)}, map[ethrpc.Hash]ethrpc.Receipt{hash(1): {BlockNumber: last + 1}}, nil, ""},

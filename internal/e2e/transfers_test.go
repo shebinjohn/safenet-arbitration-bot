@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/e2e"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
@@ -28,14 +29,15 @@ type transfersOutput struct {
 }
 
 type transferJSON struct {
-	Type     string          `json:"type"`
-	Block    uint64          `json:"block"`
-	TxHash   ethrpc.Hash     `json:"txHash"`
-	LogIndex uint64          `json:"logIndex"`
-	Token    *ethrpc.Address `json:"token"`
-	From     ethrpc.Address  `json:"from"`
-	To       ethrpc.Address  `json:"to"`
-	Value    *big.Int        `json:"value"`
+	Type      string          `json:"type"`
+	Block     uint64          `json:"block"`
+	BlockTime time.Time       `json:"blockTime"`
+	TxHash    ethrpc.Hash     `json:"txHash"`
+	LogIndex  uint64          `json:"logIndex"`
+	Token     *ethrpc.Address `json:"token"`
+	From      ethrpc.Address  `json:"from"`
+	To        ethrpc.Address  `json:"to"`
+	Value     *big.Int        `json:"value"`
 }
 
 // TestTransfers runs `arbot transfers` against the fee token and the native
@@ -80,7 +82,7 @@ func TestTransfers(t *testing.T) {
 	safeBlock := decode[requestInfo](t, arbot.Run(t, "info", "-json", r.ID.String())).Proposal.SafeBlock
 	transfer := func(receipt *e2e.Receipt, kind string, token *ethrpc.Address, from, to ethrpc.Address, value *big.Int) transferJSON {
 		return transferJSON{
-			Type: kind, Block: uint64(receipt.BlockNumber), TxHash: receipt.TransactionHash,
+			Type: kind, Block: uint64(receipt.BlockNumber), BlockTime: n.Mainnet.Header(uint64(receipt.BlockNumber)).Time(), TxHash: receipt.TransactionHash,
 			LogIndex: uint64(receipt.Logs[len(receipt.Logs)-1].LogIndex), Token: token, From: from, To: to, Value: value,
 		}
 	}
@@ -270,7 +272,7 @@ func TestTransfers(t *testing.T) {
 	t.Run("text", func(t *testing.T) {
 		text := arbot.Run(t, "transfers", "-request-file", path)
 		header := fmt.Sprintf(`(?m)^ERC-20 transfers from %s on chain 1, in blocks 0 to %d$`, safe, safeBlock)
-		row := fmt.Sprintf(`(?m)^%d +%s +%s +%s +%s$`, all[1].Block, all[1].TxHash, token, bob, ether(2))
+		row := fmt.Sprintf(`(?m)^%d +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +%s +%s +%s +%s$`, all[1].Block, all[1].TxHash, token, bob, ether(2))
 		for _, want := range []string{header, row} {
 			if !regexp.MustCompile(want).Match(text) {
 				t.Errorf("transfers: output has no line matching %q:\n%s", want, text)
@@ -282,8 +284,8 @@ func TestTransfers(t *testing.T) {
 
 		text = arbot.Run(t, "transfers", "-in", "-request-file", path)
 		header = fmt.Sprintf(`(?m)^Transfers to %s on chain 1, in blocks 0 to %d$`, safe, safeBlock)
-		tokenRow := fmt.Sprintf(`(?m)^%d +%s +erc20 +%s +%s +%s$`, in[0].Block, in[0].TxHash, token, alice, ether(6))
-		etherRow := fmt.Sprintf(`(?m)^%d +%s +native +- +%s +%s$`, in[1].Block, in[1].TxHash, bob, ether(7))
+		tokenRow := fmt.Sprintf(`(?m)^%d +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +%s +erc20 +%s +%s +%s$`, in[0].Block, in[0].TxHash, token, alice, ether(6))
+		etherRow := fmt.Sprintf(`(?m)^%d +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +%s +native +- +%s +%s$`, in[1].Block, in[1].TxHash, bob, ether(7))
 		for _, want := range []string{header, tokenRow, etherRow} {
 			if !regexp.MustCompile(want).Match(text) {
 				t.Errorf("transfers -in: output has no line matching %q:\n%s", want, text)

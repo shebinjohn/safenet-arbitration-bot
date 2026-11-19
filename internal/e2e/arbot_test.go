@@ -128,10 +128,18 @@ func TestPendingAndInfo(t *testing.T) {
 				t.Errorf("proposal: got time %s, want that of block %d", p.Time, r.Block)
 			}
 			checkBlockBefore(t, n.Mainnet, "Ethereum", p.EthereumBlock, p.Time)
+			safeNode := n.Mainnet
 			if r.Transaction.ChainID.Uint64() == ethrpc.Gnosis {
 				checkBlockBefore(t, n.Anvil, "Gnosis Chain", p.SafeBlock, p.Time)
+				safeNode = n.Anvil
 			} else if p.SafeBlock != p.EthereumBlock {
 				t.Errorf("proposal: got Safe chain block %d, want Ethereum block %d", p.SafeBlock, p.EthereumBlock)
+			}
+			if want := n.Mainnet.Header(p.EthereumBlock).Time(); !p.EthereumBlockTime.Equal(want) {
+				t.Errorf("proposal: got Ethereum block time %s, want %s", p.EthereumBlockTime, want)
+			}
+			if want := safeNode.Header(p.SafeBlock).Time(); !p.SafeBlockTime.Equal(want) {
+				t.Errorf("proposal: got Safe chain block time %s, want %s", p.SafeBlockTime, want)
 			}
 
 			// The rules that each reason of a denial cites.
@@ -275,16 +283,18 @@ type requestInfo struct {
 		DAOFeeShare uint32   `json:"daoFeeShare"`
 	} `json:"terms"`
 	Proposal struct {
-		Consensus     ethrpc.Address  `json:"consensus"`
-		Block         uint64          `json:"block"`
-		Time          time.Time       `json:"time"`
-		EthereumBlock uint64          `json:"ethereumBlock"`
-		SafeBlock     uint64          `json:"safeBlock"`
-		TxHash        ethrpc.Hash     `json:"txHash"`
-		Epoch         uint64          `json:"epoch"`
-		OracleData    ethrpc.Bytes    `json:"oracleData"`
-		SafeTxHash    ethrpc.Hash     `json:"safeTxHash"`
-		Transaction   json.RawMessage `json:"transaction"`
+		Consensus         ethrpc.Address  `json:"consensus"`
+		Block             uint64          `json:"block"`
+		Time              time.Time       `json:"time"`
+		EthereumBlock     uint64          `json:"ethereumBlock"`
+		EthereumBlockTime time.Time       `json:"ethereumBlockTime"`
+		SafeBlock         uint64          `json:"safeBlock"`
+		SafeBlockTime     time.Time       `json:"safeBlockTime"`
+		TxHash            ethrpc.Hash     `json:"txHash"`
+		Epoch             uint64          `json:"epoch"`
+		OracleData        ethrpc.Bytes    `json:"oracleData"`
+		SafeTxHash        ethrpc.Hash     `json:"safeTxHash"`
+		Transaction       json.RawMessage `json:"transaction"`
 	} `json:"proposal"`
 	Votes         []vote       `json:"votes"`
 	DisputedRules []string     `json:"disputedRules"`

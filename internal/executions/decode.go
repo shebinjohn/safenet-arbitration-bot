@@ -8,7 +8,6 @@ import (
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
-	"github.com/safe-research/safenet-arbitration-bot/internal/solabi"
 	"github.com/safe-research/safenet-arbitration-bot/internal/txservice"
 )
 
@@ -22,6 +21,9 @@ type decoder struct {
 	to         ethrpc.BlockNumber
 	executions []Execution
 	events     map[ethrpc.Hash][]*safenet.SafeTransaction
+	// listed are the transactions that the service lists, by Safe transaction hash,
+	// each of which has its hash, so that the service isn't asked for them again.
+	listed map[ethrpc.Hash]*safenet.SafeTransaction
 
 	nonceRead bool
 	// nonceNext is the Safe's nonce after the last execution, or nil if it couldn't
@@ -33,6 +35,19 @@ type decoder struct {
 	// ethrpc.Transient). Such a failure says nothing about the execution, so
 	// decoding stops rather than report it as unknown.
 	err error
+}
+
+// decodeAll decodes the Safe transaction of each execution, and sets its
+// source.
+func (d *decoder) decodeAll(ctx context.Context) error {
+	for i := range d.executions {
+		e := &d.executions[i]
+		var err error
+		if e.Source, e.Transaction, err = d.decode(ctx, i); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // decode returns the Safe transaction of executions[i] and where it is from, or
@@ -53,6 +68,11 @@ func (d *decoder) decodeSources(ctx context.Context, i int) (Source, *safenet.Sa
 		if matches(tx, e.SafeTxHash) {
 			return SourceEvent, tx
 		}
+	}
+	// A transaction that the service listed has its hash already, which proves it
+	// is the one executed, so it needs no request to the node.
+	if tx := d.listed[e.SafeTxHash]; tx != nil {
+		return SourceService, tx
 	}
 
 	// The calldata and traces have no nonce. Every execution uses one, and all of
@@ -86,18 +106,15 @@ func (d *decoder) decodeSources(ctx context.Context, i int) (Source, *safenet.Sa
 func (d *decoder) nonce(ctx context.Context, i int) *big.Int {
 	if !d.nonceRead {
 		d.nonceRead = true
-		result, err := d.Eth.Call(ctx, ethrpc.CallRequest{To: d.safe, Data: solabi.Call(nonceSelector)}, d.to)
+		next, err := d.readNonce(ctx, d.safe, d.to)
 		if ethrpc.Transient(err) {
-			d.fail(fmt.Errorf("reading the nonce of %s at block %d: %w", d.safe, d.to, err))
+			d.fail(err)
 			return nil
 		}
 		if err != nil {
-			d.warn(fmt.Errorf("reading the nonce of %s at block %d: %w", d.safe, d.to, err))
-		} else if dec := solabi.NewDecoder(result); dec.Err() == nil {
-			if next := dec.Uint(0); dec.Err() == nil {
-				d.nonceNext = next
-			}
+			d.warn(err)
 		}
+		d.nonceNext = next
 	}
 	if d.nonceNext == nil {
 		return nil
@@ -190,9 +207,9 @@ func (d *decoder) fail(err error) {
 	}
 }
 
-func (d *decoder) warn(err error) {
-	if d.Warn != nil {
-		d.Warn(err)
+func (f *Finder) warn(err error) {
+	if f.Warn != nil {
+		f.Warn(err)
 	}
 }
 

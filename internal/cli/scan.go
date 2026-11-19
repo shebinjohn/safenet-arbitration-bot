@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
+	"github.com/safe-research/safenet-arbitration-bot/internal/txservice"
 )
 
 // defaultScanBlocks is how many blocks before the Safe block that the commands
@@ -21,7 +22,9 @@ type safeRef struct {
 	ChainID uint64
 	// SafeBlock is the request's Safe block.
 	SafeBlock uint64
-	eth       *ethrpc.Client
+	// SafeTxHash is the hash of the request's Safe transaction.
+	SafeTxHash ethrpc.Hash
+	eth        *ethrpc.Client
 }
 
 // openSafe reads the request in the file at requestFile, as written by arbot
@@ -41,7 +44,7 @@ func openSafe(ctx context.Context, e *env, requestFile string) (*safeRef, error)
 	if tx.ChainID == nil || !tx.ChainID.IsUint64() || request.Proposal.SafeBlock == 0 {
 		return nil, fmt.Errorf("request in %s has no Safe chain ID or block", requestFile)
 	}
-	s := &safeRef{Safe: tx.Safe, ChainID: tx.ChainID.Uint64(), SafeBlock: request.Proposal.SafeBlock}
+	s := &safeRef{Safe: tx.Safe, ChainID: tx.ChainID.Uint64(), SafeBlock: request.Proposal.SafeBlock, SafeTxHash: request.Proposal.SafeTxHash}
 	if s.eth, err = ethrpc.NewDialer(e.cfg.RPCs)(ctx, s.ChainID); err != nil {
 		return nil, err
 	}
@@ -73,4 +76,23 @@ func openScan(ctx context.Context, e *env, requestFile string, blocks uint64) (*
 		return nil, err
 	}
 	return &scan{safeRef: safe, ToBlock: safe.SafeBlock, FromBlock: safe.SafeBlock - min(blocks-1, safe.SafeBlock)}, nil
+}
+
+// txService returns a client for the Safe Transaction Service of the chain with
+// the ID chainID, or nil if the configuration leaves it out.
+func txService(e *env, chainID uint64) *txservice.Client {
+	baseURL, ok := e.cfg.TxServices[chainID]
+	if !ok {
+		baseURL = txservice.DefaultURLs[chainID]
+	}
+	if baseURL == "" {
+		return nil
+	}
+	return txservice.NewClient(baseURL, chainID)
+}
+
+// errNoTxService is the error of a command that needs the Safe Transaction
+// Service of a chain that has none.
+func errNoTxService(flag string, chainID uint64) error {
+	return fmt.Errorf("%s needs the Safe Transaction Service of chain %d, which has none (see the txServices setting, where an empty URL leaves it out)", flag, chainID)
 }

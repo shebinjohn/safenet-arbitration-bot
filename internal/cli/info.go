@@ -67,8 +67,8 @@ func writeRequest(w io.Writer, r *safenet.Request) {
 	fmt.Fprintf(w, "\nProposal\n")
 	fmt.Fprintf(w, "  Consensus\t%s\n", p.Consensus)
 	fmt.Fprintf(w, "  Block\t%d (%s)\n", p.Block, p.Time.Format(time.RFC3339))
-	fmt.Fprintf(w, "  Ethereum block before\t%d\n", p.EthereumBlock)
-	fmt.Fprintf(w, "  Safe chain block before\t%d (chain %s)\n", p.SafeBlock, p.Transaction.ChainID)
+	fmt.Fprintf(w, "  Ethereum block before\t%d (%s)\n", p.EthereumBlock, formatTime(p.EthereumBlockTime))
+	fmt.Fprintf(w, "  Safe chain block before\t%d (chain %s, %s)\n", p.SafeBlock, p.Transaction.ChainID, formatTime(p.SafeBlockTime))
 	fmt.Fprintf(w, "  Transaction\t%s\n", p.TxHash)
 	fmt.Fprintf(w, "  Epoch\t%d\n", p.Epoch)
 	fmt.Fprintf(w, "  Oracle data\t%s\n", p.OracleData)
@@ -116,6 +116,15 @@ func writeRequest(w io.Writer, r *safenet.Request) {
 	if a.Record != nil {
 		fmt.Fprintf(w, "  Record\tblock %d, transaction %s\n", a.Record.Block, a.Record.TxHash)
 	}
+}
+
+// formatTime formats a block's timestamp in RFC 3339, or "time unknown" for the
+// zero time of a request file written before arbot reported block times.
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return "time unknown"
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // formatRules formats a list of rule identifiers, such as "R-4.1, R-4.2", or

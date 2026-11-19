@@ -36,8 +36,9 @@ type TxServiceTransfer struct {
 }
 
 // TxService is a Safe Transaction Service that lists the executions and
-// transfers of a test, in the order given, for the Safes that they are of. It
-// knows no Safe's creation.
+// transfers of a test, in the order given, for the Safes that they are of, and
+// has the executions by their Safe transaction hashes. It knows no Safe's
+// creation.
 type TxService struct {
 	*httptest.Server
 	mu         sync.Mutex
@@ -68,7 +69,33 @@ func (s *TxService) ListTransfers(transfers ...TxServiceTransfer) {
 	s.transfers = append(s.transfers, transfers...)
 }
 
+// result returns the execution as the service encodes it.
+func (e *TxServiceExecution) result() map[string]any {
+	tx := e.Transaction
+	return map[string]any{
+		"safe": tx.Safe, "to": tx.To, "value": tx.Value.String(), "data": tx.Data,
+		"operation": uint8(tx.Operation), "safeTxGas": tx.SafeTxGas.String(), "baseGas": tx.BaseGas.String(),
+		"gasPrice": tx.GasPrice.String(), "gasToken": tx.GasToken, "refundReceiver": tx.RefundReceiver,
+		"nonce": tx.Nonce.Uint64(), "safeTxHash": e.SafeTxHash, "transactionHash": e.TxHash,
+		"blockNumber": e.Block, "isExecuted": true, "isSuccessful": true,
+	}
+}
+
 func (s *TxService) serve(w http.ResponseWriter, r *http.Request) {
+	// A transaction by its Safe transaction hash, as the first execution listed
+	// with it.
+	if hash, ok := strings.CutPrefix(r.URL.Path, "/api/v1/multisig-transactions/"); ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for _, e := range s.executions {
+			if e.SafeTxHash.String()+"/" == hash {
+				json.NewEncoder(w).Encode(e.result())
+				return
+			}
+		}
+		http.NotFound(w, r)
+		return
+	}
 	path, found := strings.CutPrefix(r.URL.Path, "/api/v1/safes/")
 	address, endpoint, _ := strings.Cut(path, "/")
 	safe, err := ethrpc.ParseAddress(address)
@@ -82,14 +109,8 @@ func (s *TxService) serve(w http.ResponseWriter, r *http.Request) {
 	switch endpoint {
 	case "multisig-transactions/":
 		for _, e := range s.executions {
-			if tx := e.Transaction; tx.Safe == safe {
-				results = append(results, map[string]any{
-					"safe": tx.Safe, "to": tx.To, "value": tx.Value.String(), "data": tx.Data,
-					"operation": uint8(tx.Operation), "safeTxGas": tx.SafeTxGas.String(), "baseGas": tx.BaseGas.String(),
-					"gasPrice": tx.GasPrice.String(), "gasToken": tx.GasToken, "refundReceiver": tx.RefundReceiver,
-					"nonce": tx.Nonce.Uint64(), "safeTxHash": e.SafeTxHash, "transactionHash": e.TxHash,
-					"blockNumber": e.Block, "isExecuted": true, "isSuccessful": true,
-				})
+			if e.Transaction.Safe == safe {
+				results = append(results, e.result())
 			}
 		}
 	case "transfers/":

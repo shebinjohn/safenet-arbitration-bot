@@ -20,6 +20,7 @@ type eventsOutput struct {
 	SafeBlock uint64         `json:"safeBlock"`
 	TxHash    ethrpc.Hash    `json:"txHash"`
 	Block     uint64         `json:"block"`
+	BlockTime time.Time      `json:"blockTime"`
 	Status    string         `json:"status"`
 	From      ethrpc.Address `json:"from"`
 	To        ethrpc.Address `json:"to"`
@@ -82,6 +83,9 @@ func TestEvents(t *testing.T) {
 		got := decode[eventsOutput](t, arbot.Run(t, "events", "-json", "-request-file", path, hash.String()))
 		if got.ChainID != ethrpc.Mainnet || got.SafeBlock != safeBlock || got.TxHash != hash || got.Status != "success" {
 			t.Errorf("events %s: got chain %d, Safe block %d, transaction %s, status %s", hash, got.ChainID, got.SafeBlock, got.TxHash, got.Status)
+		}
+		if want := n.Mainnet.Header(got.Block).Time(); !got.BlockTime.Equal(want) {
+			t.Errorf("events %s: got block time %s, want %s, that of block %d", hash, got.BlockTime, want, got.Block)
 		}
 		return got
 	}

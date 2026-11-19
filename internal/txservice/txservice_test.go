@@ -71,8 +71,36 @@ func TestTransaction(t *testing.T) {
 		RefundReceiver: ethrpc.Address{19: 7},
 		Nonce:          big.NewInt(8),
 	}
-	if g, w := got.Hash(), want.Hash(); g != w {
-		t.Errorf("Transaction: got %+v with hash %s, want %+v with hash %s", got, g, want, w)
+	if g, w := got.Transaction.Hash(), want.Hash(); g != w {
+		t.Errorf("Transaction: got %+v with hash %s, want %+v with hash %s", got.Transaction, g, want, w)
+	}
+	// A transaction that the service doesn't say was executed isn't, and the hash
+	// is the one asked for.
+	if got.Executed || got.Successful != nil || got.TxHash != (ethrpc.Hash{}) || got.Block != 0 || got.SafeTxHash != hash {
+		t.Errorf("Transaction: got execution %+v, want none, with the hash asked for", got)
+	}
+}
+
+func TestTransactionExecuted(t *testing.T) {
+	client := serve(t, http.StatusOK, `{
+		"safe": "0x5afE000000000000000000000000000000000001",
+		"to": "0xa11ce00000000000000000000000000000000003",
+		"value": "0", "data": null, "operation": 0, "safeTxGas": 0, "baseGas": 0, "gasPrice": "0",
+		"gasToken": "0x0000000000000000000000000000000000000000",
+		"refundReceiver": "0x0000000000000000000000000000000000000000",
+		"nonce": 3,
+		"safeTxHash": "0x00000000000000000000000000000000000000000000000000000000000000ee",
+		"transactionHash": "0x00000000000000000000000000000000000000000000000000000000000000bb",
+		"blockNumber": 26381211,
+		"isExecuted": true,
+		"isSuccessful": false
+	}`)
+	got, err := client.Transaction(t.Context(), hash)
+	if err != nil {
+		t.Fatalf("Transaction: %v", err)
+	}
+	if !got.Executed || got.Successful == nil || *got.Successful || got.TxHash != (ethrpc.Hash{31: 0xbb}) || got.Block != 26381211 || got.SafeTxHash != hash {
+		t.Errorf("Transaction: got %+v, want an execution that failed in transaction 0xbb in block 26381211, with the hash asked for", got)
 	}
 }
 
@@ -89,8 +117,8 @@ func TestTransactionWithoutData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Transaction: %v", err)
 	}
-	if len(got.Data) != 0 {
-		t.Errorf("Transaction: got data %x, want none", got.Data)
+	if len(got.Transaction.Data) != 0 {
+		t.Errorf("Transaction: got data %x, want none", got.Transaction.Data)
 	}
 }
 

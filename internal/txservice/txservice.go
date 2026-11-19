@@ -59,23 +59,32 @@ func (c *Client) URL() string {
 }
 
 // Transaction returns the Safe transaction that the service has with the Safe
-// transaction hash safeTxHash, or ErrNotFound. The transaction's fields are as
-// the service reports them, so it may not have the hash it was asked for.
-func (c *Client) Transaction(ctx context.Context, safeTxHash ethrpc.Hash) (*safenet.SafeTransaction, error) {
+// transaction hash safeTxHash, with its execution, if the service says that it
+// was executed, or ErrNotFound. The transaction's fields are as the service
+// reports them, so it may not have the hash it was asked for, and nor is its
+// execution checked.
+func (c *Client) Transaction(ctx context.Context, safeTxHash ethrpc.Hash) (*Execution, error) {
 	u, err := url.JoinPath(c.baseURL, "api", "v1", "multisig-transactions", safeTxHash.String())
 	if err != nil {
 		return nil, err
 	}
 	// The service redirects paths without a trailing slash.
-	var t transaction
+	var t struct {
+		transaction
+		executionFields
+	}
 	if err := c.get(ctx, u+"/", &t); err != nil {
 		return nil, err
 	}
-	return t.safeTransaction(c.chainID), nil
+	x := t.execution(&t.transaction, c.chainID, false)
+	// The service's own hash may be missing, or another transaction's, so the hash
+	// asked for is kept, and the caller checks it against the fields.
+	x.SafeTxHash = safeTxHash
+	return x, nil
 }
 
-// Execution is a Safe transaction that the service lists as executed, with the
-// onchain transaction and block that it says executed it.
+// Execution is a Safe transaction that the service lists, with the onchain
+// transaction and block that it says executed it.
 type Execution struct {
 	// Transaction is the Safe transaction, with its fields as the service reports
 	// them.
@@ -86,6 +95,40 @@ type Execution struct {
 	SafeTxHash ethrpc.Hash
 	TxHash     ethrpc.Hash
 	Block      uint64
+	// Executed is whether the service says that the transaction was executed, which
+	// Executions only lists, and Successful whether it says that its call
+	// succeeded, or nil if it doesn't say.
+	Executed   bool
+	Successful *bool
+}
+
+// executionFields are the fields of a multisig transaction of the service about
+// its execution.
+type executionFields struct {
+	SafeTxHash      ethrpc.Hash  `json:"safeTxHash"`
+	TransactionHash *ethrpc.Hash `json:"transactionHash"`
+	BlockNumber     *uint64      `json:"blockNumber"`
+	IsExecuted      *bool        `json:"isExecuted"`
+	IsSuccessful    *bool        `json:"isSuccessful"`
+}
+
+// execution returns the Safe transaction t, with the execution that the fields
+// report. A transaction without isExecuted is taken as executed if executed is
+// set, as for a listing of executed transactions only.
+func (f *executionFields) execution(t *transaction, chainID *big.Int, executed bool) *Execution {
+	if f.IsExecuted != nil {
+		executed = *f.IsExecuted
+	}
+	x := &Execution{
+		Transaction: t.safeTransaction(chainID), SafeTxHash: f.SafeTxHash,
+		Executed: executed, Successful: f.IsSuccessful,
+	}
+	// An execution without its onchain transaction or block is still listed, so
+	// that the caller reports it rather than drop it.
+	if f.TransactionHash != nil && f.BlockNumber != nil {
+		x.TxHash, x.Block = *f.TransactionHash, *f.BlockNumber
+	}
+	return x
 }
 
 // pageSize is the number of executions or transfers that Executions and
@@ -121,26 +164,16 @@ func (c *Client) Executions(ctx context.Context, safe ethrpc.Address) ([]Executi
 		var page struct {
 			Results []struct {
 				transaction
-				SafeTxHash      ethrpc.Hash  `json:"safeTxHash"`
-				TransactionHash *ethrpc.Hash `json:"transactionHash"`
-				BlockNumber     *uint64      `json:"blockNumber"`
-				IsExecuted      *bool        `json:"isExecuted"`
+				executionFields
 			} `json:"results"`
 		}
 		if err := c.get(ctx, base+"/?"+query.Encode(), &page); err != nil {
 			return nil, err
 		}
 		for _, r := range page.Results {
-			if r.IsExecuted != nil && !*r.IsExecuted {
-				continue
+			if x := r.execution(&r.transaction, c.chainID, true); x.Executed {
+				executions = append(executions, *x)
 			}
-			x := Execution{SafeTxHash: r.SafeTxHash, Transaction: r.safeTransaction(c.chainID)}
-			// An execution without its onchain transaction or block is still listed, so
-			// that the caller reports it rather than drop it.
-			if r.TransactionHash != nil && r.BlockNumber != nil {
-				x.TxHash, x.Block = *r.TransactionHash, *r.BlockNumber
-			}
-			executions = append(executions, x)
 		}
 		if len(page.Results) < pageSize {
 			return executions, nil

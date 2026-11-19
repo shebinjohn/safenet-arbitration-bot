@@ -197,6 +197,24 @@ func executionsCommand(ctx context.Context, e *env, args []string) error {
 			return err
 		}
 	}
+	// Each block's time is read once, for the executions in it and the creation.
+	if err := executions.SetBlockTimes(ctx, ref.eth, found); err != nil {
+		return err
+	}
+	if proposal != nil {
+		own := []executions.Execution{*proposal}
+		if err := executions.SetBlockTimes(ctx, ref.eth, own); err != nil {
+			return err
+		}
+		proposal = &own[0]
+	}
+	if h := report.History; h != nil && h.Creation != nil {
+		t, err := ref.eth.BlockTime(ctx, ethrpc.BlockNumber(h.Creation.Block))
+		if err != nil {
+			return fmt.Errorf("reading the time of block %d, of the Safe's creation: %w", h.Creation.Block, err)
+		}
+		h.Creation.BlockTime = t
+	}
 	report.Executions = make([]execution, len(found))
 	var reader *checks.CallReader
 	var decoder *simulate.ABIDecoder
@@ -303,12 +321,12 @@ func writeHistory(e *env, report *executionsReport) {
 		if c.Factory != nil {
 			factory = "ProxyCreation event of " + c.Factory.String()
 		}
-		fmt.Fprintf(e.stdout, "Created in block %d, transaction %s (%s)\n", c.Block, c.TxHash, factory)
+		fmt.Fprintf(e.stdout, "Created in block %d (%s), transaction %s (%s)\n", c.Block, formatTime(c.BlockTime), c.TxHash, factory)
 	} else {
 		fmt.Fprintf(e.stdout, "Creation: unknown\n")
 	}
 	if x := h.ProposalExecution; x != nil {
-		fmt.Fprintf(e.stdout, "The request's own Safe transaction was executed in block %d, transaction %s (not listed below)\n", x.Block, x.TxHash)
+		fmt.Fprintf(e.stdout, "The request's own Safe transaction was executed in block %d (%s), transaction %s (not listed below)\n", x.Block, formatTime(x.BlockTime), x.TxHash)
 	}
 	fmt.Fprintln(e.stdout)
 }
@@ -316,13 +334,13 @@ func writeHistory(e *env, report *executionsReport) {
 // writeExecutions writes a table of executions.
 func writeExecutions(e *env, found []executions.Execution) error {
 	w := tabwriter.NewWriter(e.stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "BLOCK\tTRANSACTION\tRESULT\tSAFE TX HASH\tSOURCE\tNONCE\tTO\tVALUE\tOPERATION\tDATA")
+	fmt.Fprintln(w, "BLOCK\tTIME\tTRANSACTION\tRESULT\tSAFE TX HASH\tSOURCE\tNONCE\tTO\tVALUE\tOPERATION\tDATA")
 	for _, x := range found {
 		result := "failure"
 		if x.Success {
 			result = "success"
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t", x.Block, x.TxHash, result, x.SafeTxHash)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t", x.Block, formatTime(x.BlockTime), x.TxHash, result, x.SafeTxHash)
 		if tx := x.Transaction; tx != nil {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", x.Source, tx.Nonce, tx.To, tx.Value, tx.Operation, summarizeData(tx.Data))
 		} else {

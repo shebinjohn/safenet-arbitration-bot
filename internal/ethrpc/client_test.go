@@ -328,6 +328,65 @@ func TestGetBlockByNumber(t *testing.T) {
 	}
 }
 
+// TestBlockTime checks that BlockTime reads a block's header once, including
+// one that GetBlockByNumber read already.
+func TestBlockTime(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     uint64            `json:"id"`
+			Method string            `json:"method"`
+			Params []json.RawMessage `json:"params"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		res := map[string]any{"jsonrpc": "2.0", "id": req.ID}
+		switch req.Method {
+		case "eth_chainId":
+			res["result"] = "0x1"
+		case "eth_getBlockByNumber":
+			requests.Add(1)
+			var number BlockNumber
+			json.Unmarshal(req.Params[0], &number)
+			res["result"] = map[string]any{"number": number, "hash": Hash{}, "timestamp": Quantity(1_700_000_000 + 12*uint64(number))}
+		}
+		json.NewEncoder(w).Encode(res)
+	}))
+	t.Cleanup(server.Close)
+	client, err := NewClient(t.Context(), testChainID, server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.GetBlockByNumber(t.Context(), 10); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []BlockNumber{10, 20, 10, 20} {
+		got, err := client.BlockTime(t.Context(), n)
+		if err != nil {
+			t.Fatalf("BlockTime(%d): %v", n, err)
+		}
+		if want := time.Unix(1_700_000_000+12*int64(n), 0).UTC(); !got.Equal(want) || got.Location() != time.UTC {
+			t.Errorf("BlockTime(%d): got %s, want %s", n, got, want)
+		}
+	}
+	if got := requests.Load(); got != 2 {
+		t.Errorf("BlockTime: the node was asked for %d headers, want 2", got)
+	}
+}
+
+// TestGetBlockByNumberWrongNumber checks that a header of another block than
+// the one asked for is rejected, so that its timestamp isn't taken for the
+// block's.
+func TestGetBlockByNumberWrongNumber(t *testing.T) {
+	client := serve(t,
+		`{"jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["0x2625a00", false]}`,
+		`{"result": {"number": "0x2625a01", "hash": "0x00000000000000000000000000000000000000000000000000000000000000bb", "timestamp": "0x68d3a000"}}`,
+	)
+	if _, err := client.GetBlockByNumber(t.Context(), 40_000_000); err == nil {
+		t.Fatal("GetBlockByNumber: expected an error for another block")
+	}
+}
+
 func TestGetBlockByNumberNotFound(t *testing.T) {
 	client := serve(t,
 		`{"jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["0x2625a00", false]}`,

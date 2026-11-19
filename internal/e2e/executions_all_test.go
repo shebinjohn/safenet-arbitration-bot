@@ -142,7 +142,7 @@ func TestExecutionsAll(t *testing.T) {
 	text := arbot.Run(t, "executions", "-all", "-request-file", path)
 	for _, want := range []string{
 		`(?m)^Missing nonces: none$`,
-		`(?m)^\d+ +` + first.TxHash.String() + ` +success +` + first.SafeTxHash.String() + ` +service +0 +` + target.String() + ` +0 +CALL +0x66697273 \(5 bytes\)$`,
+		`(?m)^\d+ +\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ +` + first.TxHash.String() + ` +success +` + first.SafeTxHash.String() + ` +service +0 +` + target.String() + ` +0 +CALL +0x66697273 \(5 bytes\)$`,
 		`(?m)^3 +` + misreported.SafeTxHash.String() + ` +` + misreported.TxHash.String() + ` +the transaction's fields don't hash`,
 	} {
 		if !regexp.MustCompile(want).Match(text) {

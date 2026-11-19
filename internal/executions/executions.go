@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -63,6 +64,9 @@ const (
 // Execution is a Safe transaction that a Safe executed.
 type Execution struct {
 	Block uint64 `json:"block"`
+	// BlockTime is the timestamp of Block, which SetBlockTimes sets, or zero if it
+	// isn't read.
+	BlockTime time.Time `json:"blockTime,omitzero"`
 	// TxHash is the hash of the onchain transaction that executed it, and LogIndex
 	// the index in its block of the log that says so.
 	TxHash   ethrpc.Hash `json:"txHash"`
@@ -169,6 +173,20 @@ func (c *collector) scan(ctx context.Context, from, to ethrpc.BlockNumber) (int,
 	return read, nil
 }
 
+// SetBlockTimes sets the BlockTime of each of executions to the timestamp of
+// its block, which it reads from eth once per block.
+func SetBlockTimes(ctx context.Context, eth *ethrpc.Client, executions []Execution) error {
+	for i := range executions {
+		x := &executions[i]
+		t, err := eth.BlockTime(ctx, ethrpc.BlockNumber(x.Block))
+		if err != nil {
+			return fmt.Errorf("reading the time of block %d: %w", x.Block, err)
+		}
+		x.BlockTime = t
+	}
+	return nil
+}
+
 // readNonce returns the nonce of the Safe at block.
 func (f *Finder) readNonce(ctx context.Context, safe ethrpc.Address, block ethrpc.BlockNumber) (*big.Int, error) {
 	result, err := f.Eth.Call(ctx, ethrpc.CallRequest{To: safe, Data: solabi.Call(nonceSelector)}, block)
@@ -181,6 +199,26 @@ func (f *Finder) readNonce(ctx context.Context, safe ethrpc.Address, block ethrp
 		return nil, fmt.Errorf("reading the nonce of %s at block %d: %w", safe, block, err)
 	}
 	return nonce, nil
+}
+
+// InReceipt returns the execution of the Safe transaction with the hash
+// safeTxHash that safe logged in the transaction of receipt, and whether it
+// logged one. The execution's transaction is unknown, since the log only has
+// its hash.
+func InReceipt(receipt ethrpc.Receipt, safe ethrpc.Address, safeTxHash ethrpc.Hash) (Execution, bool) {
+	for _, log := range receipt.Logs {
+		if log.Removed || log.Address != safe || len(log.Topics) == 0 ||
+			log.Topics[0] != executionSuccessEvent && log.Topics[0] != executionFailureEvent {
+			continue
+		}
+		// A node may leave the transaction hash and block out of the logs of a receipt,
+		// which are those of the receipt.
+		log.TransactionHash, log.BlockNumber = receipt.TransactionHash, receipt.BlockNumber
+		if e, ok := decodeExecution(log); ok && e.SafeTxHash == safeTxHash {
+			return e, true
+		}
+	}
+	return Execution{}, false
 }
 
 // decodeExecution decodes an ExecutionSuccess or ExecutionFailure log. Safe

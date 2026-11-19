@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,13 @@ type Client struct {
 	url     string
 	http    *http.Client
 	id      atomic.Uint64
+
+	// times are the timestamps of the blocks that the client fetched, by number, so
+	// that BlockTime reads each block once. A command reads blocks that are final
+	// or nearly so, and runs for seconds, so a reorganization that changes a
+	// timestamp in the meantime is left out.
+	mu    sync.Mutex
+	times map[BlockNumber]time.Time
 }
 
 // connectTimeout bounds how long NewClient waits for each default RPC node to
@@ -188,7 +196,33 @@ func (c *Client) GetBlockByNumber(ctx context.Context, number BlockNumber) (Bloc
 	if result == nil {
 		return Block{}, fmt.Errorf("eth_getBlockByNumber: block %d not found", number)
 	}
+	if result.Number != number {
+		return Block{}, fmt.Errorf("eth_getBlockByNumber: the node returned block %d, not %d", result.Number, number)
+	}
+	c.mu.Lock()
+	if c.times == nil {
+		c.times = make(map[BlockNumber]time.Time)
+	}
+	c.times[number] = result.Time()
+	c.mu.Unlock()
 	return *result, nil
+}
+
+// BlockTime returns the timestamp of the block with the given number, in UTC.
+// It reads the block's header once, the first time that it or GetBlockByNumber
+// is asked for the block, and returns the same time after.
+func (c *Client) BlockTime(ctx context.Context, number BlockNumber) (time.Time, error) {
+	c.mu.Lock()
+	t, ok := c.times[number]
+	c.mu.Unlock()
+	if ok {
+		return t, nil
+	}
+	block, err := c.GetBlockByNumber(ctx, number)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return block.Time(), nil
 }
 
 // FinalizedBlock returns the header of the node's most recent finalized block

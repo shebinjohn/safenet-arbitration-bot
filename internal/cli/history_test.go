@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -62,6 +63,10 @@ func (c *historyChain) serve(t *testing.T) string {
 			res["result"] = ethrpc.Bytes(word[:])
 		case "eth_getCode":
 			res["result"] = "0x"
+		case "eth_getBlockByNumber":
+			var number ethrpc.BlockNumber
+			json.Unmarshal(req.Params[0], &number)
+			res["result"] = fakeHeader(number)
 		case "eth_getLogs":
 			var filter ethrpc.LogFilter
 			json.Unmarshal(req.Params[0], &filter)
@@ -96,6 +101,17 @@ func (c *historyChain) serve(t *testing.T) string {
 	}))
 	t.Cleanup(server.Close)
 	return server.URL
+}
+
+// fakeHeader returns the header of block number of a fake node, whose blocks
+// are 12 seconds apart, like those of Ethereum Mainnet.
+func fakeHeader(number ethrpc.BlockNumber) map[string]any {
+	return map[string]any{"number": number, "hash": ethrpc.Hash{}, "timestamp": ethrpc.Quantity(fakeBlockTime(number).Unix())}
+}
+
+// fakeBlockTime returns the timestamp of block number of a fake node.
+func fakeBlockTime(number ethrpc.BlockNumber) time.Time {
+	return time.Unix(1_700_000_000+12*int64(number), 0).UTC()
 }
 
 // historyService is a fake Safe Transaction Service for Ethereum Mainnet that
@@ -212,6 +228,7 @@ func TestExecutionsAll(t *testing.T) {
 		FromBlock  uint64 `json:"fromBlock"`
 		ToBlock    uint64 `json:"toBlock"`
 		Executions []struct {
+			BlockTime  time.Time   `json:"blockTime"`
 			SafeTxHash ethrpc.Hash `json:"safeTxHash"`
 			Source     string      `json:"source"`
 		} `json:"executions"`
@@ -231,6 +248,7 @@ func TestExecutionsAll(t *testing.T) {
 			Creation          json.RawMessage `json:"creation"`
 			ProposalExecution *struct {
 				Block      uint64      `json:"block"`
+				BlockTime  time.Time   `json:"blockTime"`
 				SafeTxHash ethrpc.Hash `json:"safeTxHash"`
 			} `json:"proposalExecution"`
 		} `json:"history"`
@@ -243,9 +261,12 @@ func TestExecutionsAll(t *testing.T) {
 		got.Executions[0].SafeTxHash != first.Hash() || got.Executions[1].SafeTxHash != third.Hash() || got.Executions[0].Source != "service" {
 		t.Errorf("executions -all: got %s, want the first and third executions, from the service, in blocks 0 to 200", stdout.String())
 	}
+	if len(got.Executions) == 2 && (!got.Executions[0].BlockTime.Equal(fakeBlockTime(100)) || !got.Executions[1].BlockTime.Equal(fakeBlockTime(120))) {
+		t.Errorf("executions -all: got block times %s and %s, want those of blocks 100 and 120", got.Executions[0].BlockTime, got.Executions[1].BlockTime)
+	}
 	// The request's own execution is apart, and counts toward the nonces.
-	if p := h.ProposalExecution; p == nil || p.SafeTxHash != own.Hash() || p.Block != 110 {
-		t.Errorf("executions -all: got the proposal's execution %+v, want the one in block 110", p)
+	if p := h.ProposalExecution; p == nil || p.SafeTxHash != own.Hash() || p.Block != 110 || !p.BlockTime.Equal(fakeBlockTime(110)) {
+		t.Errorf("executions -all: got the proposal's execution %+v, want the one in block 110, with its time", p)
 	}
 	if h.Service.URL != serviceURL || h.Service.ObservedAt == "" || h.Nonce != 3 || !h.Complete || h.Missing == nil || len(h.Missing) != 0 ||
 		h.Scanned == nil || len(h.Rejected) != 1 || h.Rejected[0].SafeTxHash != other.Hash() || !strings.Contains(h.Rejected[0].Reason, "for the Safe") ||
@@ -262,8 +283,8 @@ func TestExecutionsAll(t *testing.T) {
 		`(?m)^Nonce at block 200: 3 \(complete\)$`,
 		`(?m)^Missing nonces: none$`,
 		`(?m)^Creation: unknown$`,
-		`(?m)^The request's own Safe transaction was executed in block 110, transaction ` + hashOf(2).String() + ` \(not listed below\)$`,
-		`(?m)^120 +` + hashOf(3).String() + ` +success +` + third.Hash().String() + ` +service +2 +`,
+		`(?m)^The request's own Safe transaction was executed in block 110 \(` + fakeBlockTime(110).Format(time.RFC3339) + `\), transaction ` + hashOf(2).String() + ` \(not listed below\)$`,
+		`(?m)^120 +` + fakeBlockTime(120).Format(time.RFC3339) + ` +` + hashOf(3).String() + ` +success +` + third.Hash().String() + ` +service +2 +`,
 		`(?m)^2 +` + other.Hash().String() + ` +` + hashOf(4).String() + ` +the transaction is for the Safe`,
 	} {
 		if !regexp.MustCompile(want).Match(stdout.Bytes()) {
@@ -350,9 +371,10 @@ func TestTransfersAll(t *testing.T) {
 		FromBlock uint64 `json:"fromBlock"`
 		ToBlock   uint64 `json:"toBlock"`
 		Transfers []struct {
-			Block uint64         `json:"block"`
-			To    ethrpc.Address `json:"to"`
-			Value *big.Int       `json:"value"`
+			Block     uint64         `json:"block"`
+			BlockTime time.Time      `json:"blockTime"`
+			To        ethrpc.Address `json:"to"`
+			Value     *big.Int       `json:"value"`
 		} `json:"transfers"`
 		Service *struct {
 			URL        string `json:"url"`
@@ -365,8 +387,9 @@ func TestTransfersAll(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("transfers -all: %v\n%s", err, stdout.String())
 	}
-	if got.FromBlock != 0 || got.ToBlock != 200 || len(got.Transfers) != 1 || got.Transfers[0].Block != 100 || got.Transfers[0].Value.Int64() != 5 {
-		t.Errorf("transfers -all: got %s, want the transfer to alice in block 100", stdout.String())
+	if got.FromBlock != 0 || got.ToBlock != 200 || len(got.Transfers) != 1 || got.Transfers[0].Block != 100 || got.Transfers[0].Value.Int64() != 5 ||
+		!got.Transfers[0].BlockTime.Equal(fakeBlockTime(100)) {
+		t.Errorf("transfers -all: got %s, want the transfer to alice in block 100, with its time", stdout.String())
 	}
 	if s := got.Service; s == nil || s.URL != serviceURL || s.ObservedAt == "" || s.Listed != 2 || s.Blocks != 2 || s.Unmatched != 1 {
 		t.Errorf("transfers -all: got service %+v, want 2 listed in 2 blocks, 1 unmatched", s)

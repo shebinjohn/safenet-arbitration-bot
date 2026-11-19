@@ -400,7 +400,7 @@ func (s *session) proposalBlocks(ctx context.Context, p *Proposal) error {
 	if safeChain != ethrpc.Mainnet && safeChain != s.eth.ChainID() {
 		chains = append(chains, safeChain)
 	}
-	blocks := make([]uint64, len(chains))
+	blocks := make([]ethrpc.Block, len(chains))
 	errs := make([]error, len(chains))
 	var wg sync.WaitGroup
 	for i, chain := range chains {
@@ -411,49 +411,50 @@ func (s *session) proposalBlocks(ctx context.Context, p *Proposal) error {
 		return err
 	}
 
-	p.EthereumBlock = blocks[0]
+	p.EthereumBlock, p.EthereumBlockTime = uint64(blocks[0].Number), blocks[0].Time()
+	safeBlock := blocks[0]
 	switch safeChain {
 	case s.eth.ChainID():
 		block, err := s.parentBlock(ctx, p)
 		if err != nil {
 			return err
 		}
-		p.SafeBlock = block
+		safeBlock = block
 	case ethrpc.Mainnet:
-		p.SafeBlock = p.EthereumBlock
 	default:
-		p.SafeBlock = blocks[1]
+		safeBlock = blocks[1]
 	}
+	p.SafeBlock, p.SafeBlockTime = uint64(safeBlock.Number), safeBlock.Time()
 	return nil
 }
 
 // parentBlock returns the last block before p's time on the chain of the
 // proposal. Gnosis Chain gives each block a later timestamp than its parent, so
 // this is the proposal block's parent. The search is for chains that don't.
-func (s *session) parentBlock(ctx context.Context, p *Proposal) (uint64, error) {
+func (s *session) parentBlock(ctx context.Context, p *Proposal) (ethrpc.Block, error) {
 	parent, err := s.eth.GetBlockByNumber(ctx, ethrpc.BlockNumber(p.Block-1))
 	if err != nil {
-		return 0, fmt.Errorf("getting the block before the proposal: %w", err)
+		return ethrpc.Block{}, fmt.Errorf("getting the block before the proposal: %w", err)
 	}
 	if !parent.Time().Before(p.Time) {
 		if parent, err = s.eth.SearchBlock(ctx, p.Time); err != nil {
-			return 0, err
+			return ethrpc.Block{}, err
 		}
 	}
-	return uint64(parent.Number), nil
+	return parent, nil
 }
 
 // blockBefore returns the last block before t on the chain with the given ID.
-func (s *session) blockBefore(ctx context.Context, chainID uint64, t time.Time) (uint64, error) {
+func (s *session) blockBefore(ctx context.Context, chainID uint64, t time.Time) (ethrpc.Block, error) {
 	eth, err := s.dial(ctx, chainID)
 	if err != nil {
-		return 0, fmt.Errorf("connecting to chain %d: %w", chainID, err)
+		return ethrpc.Block{}, fmt.Errorf("connecting to chain %d: %w", chainID, err)
 	}
 	block, err := eth.SearchBlock(ctx, t)
 	if err != nil {
-		return 0, fmt.Errorf("chain %d: %w", chainID, err)
+		return ethrpc.Block{}, fmt.Errorf("chain %d: %w", chainID, err)
 	}
-	return uint64(block.Number), nil
+	return block, nil
 }
 
 // decodeProposal decodes a TransactionProposed log.

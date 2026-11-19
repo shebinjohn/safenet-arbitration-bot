@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 	"github.com/safe-research/safenet-arbitration-bot/internal/safenet"
@@ -336,11 +337,11 @@ func TestFind(t *testing.T) {
 	}
 
 	want := []Execution{
-		{100, hash(1), 1, viaEvent.Hash(), true, big.NewInt(9), SourceEvent, viaEvent},
-		{110, hash(2), 0, viaCalldata.Hash(), false, big.NewInt(9), SourceCalldata, viaCalldata},
-		{120, hash(3), 3, viaTrace.Hash(), true, big.NewInt(9), SourceTrace, viaTrace},
-		{130, hash(4), 0, viaService.Hash(), true, big.NewInt(9), SourceService, viaService},
-		{140, hash(5), 0, unknown.Hash(), true, big.NewInt(9), "", nil},
+		{100, time.Time{}, hash(1), 1, viaEvent.Hash(), true, big.NewInt(9), SourceEvent, viaEvent},
+		{110, time.Time{}, hash(2), 0, viaCalldata.Hash(), false, big.NewInt(9), SourceCalldata, viaCalldata},
+		{120, time.Time{}, hash(3), 3, viaTrace.Hash(), true, big.NewInt(9), SourceTrace, viaTrace},
+		{130, time.Time{}, hash(4), 0, viaService.Hash(), true, big.NewInt(9), SourceService, viaService},
+		{140, time.Time{}, hash(5), 0, unknown.Hash(), true, big.NewInt(9), "", nil},
 	}
 	if !reflect.DeepEqual(got, want) {
 		for i := range got {

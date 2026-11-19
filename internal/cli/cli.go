@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/config"
+	"github.com/safe-research/safenet-arbitration-bot/internal/etherscan"
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
 )
 
@@ -34,6 +35,7 @@ var commands = map[string]struct {
 	"charter":         {charter, "fetch the Safenet Arbitration Charter"},
 	"check-report":    {checkReport, "check the values of a draft ruling against the files of its arbitration"},
 	"events":          {eventsCommand, "list the events that a transaction logged, on the Safe's chain of a Safenet request"},
+	"explorer":        {explorerCommand, "read Etherscan's index of an account on the Safe's chain of a Safenet request, with an optional API key"},
 	"executions":      {executionsCommand, "list the Safe transactions that the Safe of a Safenet request executed"},
 	"contract-source": {contractSourceCommand, "print the source code of a contract on the Safe's chain of a Safenet request"},
 	"classify":        {classify, "classify a Safenet request with deterministic Charter checks"},
@@ -80,6 +82,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		// The node didn't answer, which says nothing about the chain: the command
 		// failed rather than report something it couldn't read.
 		fmt.Fprintf(stderr, "%s: a request to the node failed rather than being answered; run the command again later, or with another RPC URL in the config\n", e.progname)
+	}
+	if etherscan.Transient(err) {
+		fmt.Fprintf(stderr, "%s: a request to Etherscan failed rather than being answered; run the command again later\n", e.progname)
 	}
 	return code
 }

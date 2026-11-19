@@ -21,6 +21,9 @@ Two properties of the Safe are formally verified, and need no evidence (see Safe
 5. **What the transaction does**: `arbot simulate -json -all -trace -request-file <request.json>`.
    - Shows: the whole transaction run in the Safe's own context on the state at `safeBlock`, delegate calls included, with `simulateAndRevert`, whether it returns or reverts, and with `-trace`, every nested call, such as a `DELEGATECALL` that a delegate called contract makes, and every contract that it creates.
    - Can't show: the storage slots that a delegate call writes, which the trace doesn't list, the effects of the executed transaction, or the signatures, nonce, guard, and gas checks, which a simulation skips.
+6. **Optional, with an Etherscan key: each delegate call target's deployer and verification**, other than a § 2.1 MultiSend: `arbot explorer creation -json -request-file <request.json> <target>` and `arbot explorer source -json -request-file <request.json> <target>`.
+   - Shows: from Etherscan (offchain, § 3.4, with its `url`, `observedAt`, and `confirmedOnchain`): the target's creator, creation transaction, and block, confirmed onchain if `confirmedOnchain` is `true`, and whether Etherscan has verified its source, as a second record next to Sourcify's, which matters for a target that Sourcify hasn't verified.
+   - Can't show: the source itself, which `arbot contract-source` gives from Sourcify, or when Etherscan verified it. Without an Etherscan key, the commands fail: record the target's creator as a gap, "Etherscan not configured".
 
 ## Facts to Record
 

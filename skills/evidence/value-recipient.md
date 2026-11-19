@@ -25,6 +25,9 @@ For R-4.3: a transaction is insecure if it sends value to a recipient outside th
 7. **What the transaction sends**, if a call's recipient isn't in its data: `arbot simulate -json -all -trace -request-file <request.json>`.
    - Shows: the whole transaction run on the state at `safeBlock`, with every nested call of the trace and its value, which is onchain data (§ 2.8).
    - Can't show: the effects of the executed transaction, which can differ in a later block. It needs a node that serves `debug_traceCall`, or it says that the trace is unavailable.
+8. **Optional, with an Etherscan key: each recipient's own history and age**: `arbot explorer creation -json -request-file <request.json> <recipient>`, `arbot explorer txs -json -request-file <request.json> <recipient>`, and `arbot explorer tokentx -json -request-file <request.json> <recipient>`, and with `-chain <id>`, the same address on another network that the Charter covers.
+   - Shows: from Etherscan (offchain, § 3.4, with its `url`, `observedAt`, and `confirmedOnchain`), up to `safeBlock`: a contract recipient's creator, factory, creation transaction, and block, which give its age, confirmed onchain if `confirmedOnchain` is `true`; and the recipient's transactions and ERC-20 transfers with accounts other than the Safe, which aren't confirmed onchain.
+   - Can't show: labels, which need a paid plan; internal calls, such as native currency that a contract sent it; or more than 10,000 results, so a `capped` listing is incomplete. A creation with `afterCutoff` isn't evidence (§ 3.6). Without an Etherscan key, the commands fail: record the recipient's own history, creator, and age as a gap, "Etherscan not configured".
 
 ## Facts to Record
 
@@ -39,5 +42,5 @@ For R-4.3: a transaction is insecure if it sends value to a recipient outside th
 
 - Native currency sent out of the Safe, and ERC-721 transfers, which `arbot transfers` doesn't list.
 - Native currency sent to the Safe's address before it had code, which logged no `SafeReceived` event.
-- A recipient's own history with accounts other than the Safe, its creator, and its creation.
+- A recipient's own history with accounts other than the Safe, its creator, and its creation, unless an Etherscan key is configured (step 8): without one, record it as "Etherscan not configured". Etherscan's listings aren't confirmed onchain, and a `capped` one is incomplete.
 - Standard user behavior for comparable transactions (§ 2.9), and public labels or flags on a recipient (§ 2.7, § 3.4), which no `arbot` command reports.

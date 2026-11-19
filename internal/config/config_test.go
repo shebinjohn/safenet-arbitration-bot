@@ -107,9 +107,10 @@ func TestLoadXDGDefaultsToHomeConfig(t *testing.T) {
 
 func TestLoadRejectsInvalidConfig(t *testing.T) {
 	for name, contents := range map[string]string{
-		"syntax":        `{`,
-		"unknown field": `{"unknown": true}`,
-		"trailing data": `{} {}`,
+		"syntax":                  `{`,
+		"unknown field":           `{"unknown": true}`,
+		"trailing data":           `{} {}`,
+		"unknown etherscan field": `{"etherscan": {"key": "TESTKEY"}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			cwd, _, _ := setup(t)
@@ -131,7 +132,8 @@ func TestLoadSettings(t *testing.T) {
 		"txServices": {"1": "https://tx-service.example/eth"},
 		"sourcify": "https://sourcify.example/server",
 		"consensus": "0x00000000000000000000000000000000000000aa",
-		"oracle": "0x00000000000000000000000000000000000000bb"
+		"oracle": "0x00000000000000000000000000000000000000bb",
+		"etherscan": {"apiKey": "TESTKEY", "url": "https://etherscan.example/v2/api"}
 	}`)
 
 	config, err := Load(path)
@@ -145,8 +147,9 @@ func TestLoadSettings(t *testing.T) {
 		Sourcify:   "https://sourcify.example/server",
 		Consensus:  ethrpc.Address{19: 0xaa},
 		Oracle:     ethrpc.Address{19: 0xbb},
+		Etherscan:  Etherscan{APIKey: "TESTKEY", URL: "https://etherscan.example/v2/api"},
 	}
-	if !maps.Equal(config.RPCs, want.RPCs) || !maps.Equal(config.TxServices, want.TxServices) || config.IPFS != want.IPFS || config.Sourcify != want.Sourcify || config.Oracle != want.Oracle || config.Consensus != want.Consensus {
+	if !maps.Equal(config.RPCs, want.RPCs) || !maps.Equal(config.TxServices, want.TxServices) || config.IPFS != want.IPFS || config.Sourcify != want.Sourcify || config.Oracle != want.Oracle || config.Consensus != want.Consensus || config.Etherscan != want.Etherscan {
 		t.Errorf("Load: got %+v, want %+v", config, want)
 	}
 }

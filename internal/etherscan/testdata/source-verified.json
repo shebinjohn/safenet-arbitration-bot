@@ -1,0 +1,24 @@
+{
+  "status": "1",
+  "message": "OK",
+  "result": [
+    {
+      "SourceCode": "pragma solidity ^0.4.24;",
+      "ABI": "[]",
+      "ContractName": "FiatTokenProxy",
+      "CompilerVersion": "v0.4.24+commit.e67f0147",
+      "CompilerType": "solc",
+      "OptimizationUsed": "0",
+      "Runs": "200",
+      "ConstructorArguments": "0000000000000000000000000882477e7895bdc5cea7cb1552ed914ab157fe56",
+      "EVMVersion": "Default",
+      "Library": "",
+      "ContractFileName": "",
+      "LicenseType": "",
+      "Proxy": "1",
+      "Implementation": "0x43506849d7c04f9138d1a2050bbf3a0c054402dd",
+      "SwarmSource": "",
+      "SimilarMatch": ""
+    }
+  ]
+}

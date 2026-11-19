@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/safe-research/safenet-arbitration-bot/internal/ethrpc"
@@ -37,6 +38,21 @@ type chain struct {
 	// failing are the methods that the node fails with HTTP status 500, as a node
 	// does that is overloaded.
 	failing []string
+	// receipts are the receipts by transaction hash.
+	receipts map[ethrpc.Hash]ethrpc.Receipt
+	// deployed is the first block at which the Safe has code, or 0 if it has none.
+	deployed uint64
+
+	mu sync.Mutex
+	// emptyOnce are the blocks whose logs the node serves without the Safe's the
+	// first time that it is asked for them, like a node behind a load balancer that
+	// is behind.
+	emptyOnce map[uint64]bool
+	// failingBlocks are the blocks whose logs the node fails to serve with HTTP
+	// status 500.
+	failingBlocks []uint64
+	// ranges are the block ranges of the eth_getLogs requests, in order.
+	ranges []BlockRange
 }
 
 // serve starts the node, and returns a client for it.
@@ -64,7 +80,20 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 		case "eth_getLogs":
 			var filter ethrpc.LogFilter
 			json.Unmarshal(req.Params[0], &filter)
+			c.mu.Lock()
+			c.ranges = append(c.ranges, BlockRange{uint64(filter.FromBlock), uint64(filter.ToBlock)})
+			empty := filter.FromBlock == filter.ToBlock && c.emptyOnce[uint64(filter.FromBlock)]
+			delete(c.emptyOnce, uint64(filter.FromBlock))
+			c.mu.Unlock()
+			if slices.ContainsFunc(c.failingBlocks, func(b uint64) bool { return b >= uint64(filter.FromBlock) && b <= uint64(filter.ToBlock) }) {
+				http.Error(w, "overloaded", http.StatusInternalServerError)
+				return
+			}
 			logs := []ethrpc.Log{}
+			if empty {
+				res["result"] = logs
+				break
+			}
 			for _, log := range c.logs {
 				if log.BlockNumber >= filter.FromBlock && log.BlockNumber <= filter.ToBlock &&
 					slices.Contains(filter.Addresses, log.Address) && slices.Contains(filter.Topics[0], log.Topics[0]) {
@@ -88,6 +117,24 @@ func (c *chain) serve(t *testing.T) *ethrpc.Client {
 			json.Unmarshal(req.Params[0], &hash)
 			if tx, ok := c.txs[hash]; ok {
 				res["result"] = tx
+			} else {
+				res["result"] = nil
+			}
+		case "eth_getCode":
+			var address ethrpc.Address
+			var block ethrpc.BlockNumber
+			json.Unmarshal(req.Params[0], &address)
+			json.Unmarshal(req.Params[1], &block)
+			if address == safe && c.deployed > 0 && uint64(block) >= c.deployed {
+				res["result"] = "0x5afe"
+			} else {
+				res["result"] = "0x"
+			}
+		case "eth_getTransactionReceipt":
+			var hash ethrpc.Hash
+			json.Unmarshal(req.Params[0], &hash)
+			if receipt, ok := c.receipts[hash]; ok {
+				res["result"] = receipt
 			} else {
 				res["result"] = nil
 			}

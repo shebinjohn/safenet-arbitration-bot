@@ -1,0 +1,120 @@
+<section class="group">
+  <div class="group-head"><h2>A transfer executed before its proposal</h2><span class="pill open">no case accepted, R-4.3</span></div>
+  <p>A single stablecoin <code>transfer</code>, with one <code>DENIED</code> vote citing <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:863d07a43e2c}} (Arbitrum One, nonce 0)</h3>
+      <ul>
+        <li><strong>Call:</strong> <code>transfer</code> of 100100000 of {{addr:42161:0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9}} to {{addr:42161:0x0fa219e7b14db1e2b6aa20eb14b5f0bf6feba3ab}}.</li>
+        <li><strong>History:</strong> the Safe {{addr:42161:0x3efc972c8c5a9c9c443cfe482189a6c279c6b0bc}} is new, with one owner. Its only payment to the recipient is this transaction itself, which it executed in {{tx:42161:0xb230ecc929ec8d3a163a9617b7439dc17b93b32988a5e3c2846e47457045c0e9}}, 3 seconds before the proposal. Its nonce 0 was therefore stale.</li>
+        <li><strong>Last case:</strong> argued <code>insecure</code>, following {{prec:0xa049284b}}, whose transaction had also run before its proposal. It was thrown out because its § 6.4 departure from {{prec:0x1fcf9563}} misdescribed that ruling.</li>
+        <li><strong>Draft:</strong> no case accepted in 3 judgments. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:863d07a43e2c}}:</strong> {{prec:0x1fcf9563}} holds that an execution before the proposal "supplies affirmative history … even though the same Safe transaction was subsequently proposed", which points to <code>secure</code>. {{prec:0xa049284b}}, an R-4.3 transfer also executed before its proposal, was ruled insecure without saying how it weighed that execution. Reconciling the two is the question of <a href="https://github.com/safe-research/safenet-charter/issues/27" target="_blank" rel="noopener">Charter issue #27</a>. Public flags on the recipient, and any link between it and the owner, are also unchecked.</p><p><strong>Found after the arbitration:</strong> {{prec:0x4e701ce5}}, an R-4.3 transfer, was also executed before its proposal, and its ruling says "The transaction's own execution in block 26381717 was not considered (§ 2.8)". It rested on an earlier payment instead. Under the same rule, the Council has given a transaction's own pre-proposal execution no weight; here that execution is the only link to the recipient. The report notes this; no agent weighed it.</p></div>
+</section>
+
+<section class="group">
+  <div class="group-head"><h2>Vault redeem requests</h2><span class="pill secure">secure, R-4.3</span></div>
+  <p>Three Safes call <code>claimSharesAndRequestRedeem(uint256)</code> on vaults that share one implementation, {{addr:1:0xe50554ec802375c9c3f9c087a8a7bb8c26d3dedf}}, Sourcify-verified as <code>Vault</code>. Each call sends no native value, and its data names no recipient. By the verified code, its claims go to the Safe, and the Safe's shares move to the vault's pending silo, a verified <code>Silo</code> with no function that pays out. Sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}} voted <code>DENIED</code> citing <code>R-4.3</code> on all three, and {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} also on {{req:d39dc3a746b9}}.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:d39dc3a746b9}} (Ethereum, nonce 2)</h3>
+      <ul>
+        <li><strong>Vault:</strong> {{addr:1:0xf10801bcc3deaf467fb8b3dbb7430111822e6dab}} (<code>derUSDC</code>), from the Safe {{addr:1:0xab707431d416b8495825e89c0dc41c4502e1242c}}.</li>
+        <li><strong>Silo:</strong> {{addr:1:0xafc5b1567c156b148913e78b1ea7b591fb40adfa}}, identified from the vault's settlement logs before the Safe block.</li>
+        <li><strong>History:</strong> the Safe holds the vault token, whitelisted itself on the vault at nonce 1, and received 12 mints of the token.</li>
+        <li><strong>Draft:</strong> secure, accepted in the third judgment after two cases were thrown out over the silo. Human review isn't flagged.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>{{req:f8a4d29019be}} (Ethereum, nonce 10)</h3>
+      <ul>
+        <li><strong>Vault:</strong> {{addr:1:0x9a4f91ce55fb9ceab0205a3f817e3b700df2925e}} (<code>derBTC</code>, proxy unverified at Sourcify), from the Safe {{addr:1:0x14326e0664631430fe7187c826041e732629dedd}}.</li>
+        <li><strong>Silo:</strong> {{addr:1:0x65e2824c1004d3db11940cf798980630a2f172ad}}, identified from a settlement burn in the same transaction as the Safe's last mint, before the Safe block.</li>
+        <li><strong>History:</strong> 14 mints of the vault token. At nonce 9 the Safe's <code>addToWhitelist</code> call succeeded, which shows that it held the vault's whitelist-manager role (derived).</li>
+        <li><strong>Draft:</strong> secure, accepted in the first judgment. Human review isn't flagged.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>{{req:b2aaafd43fb7}} (Ethereum, nonce 4)</h3>
+      <ul>
+        <li><strong>Vault:</strong> {{addr:1:0xec5dfbb37bf296980d15086b6edfbd12d2836e50}} (<code>derEURC</code>, a Sourcify-verified <code>OptinProxy</code>), from the Safe {{addr:1:0x3579d761025f9c755f997dfa7749775b0adebae7}}.</li>
+        <li><strong>Silo:</strong> {{addr:1:0x134f24b1a4c34f18457ec5a37cf46fb9bc9215dc}}, identified from its approval to the vault in the vault's creation transaction, and a burn of its shares in the transaction of one of the Safe's two mints.</li>
+        <li><strong>History:</strong> two mints make up the Safe's whole balance of the token. Ten blocks before the Safe block, it called <code>addToWhitelist</code> on the vault.</li>
+        <li><strong>Draft:</strong> secure, accepted in the first judgment. Human review isn't flagged.</li>
+      </ul>
+    </div>
+  </div>
+  <p>All three apply {{prec:0xb839c644}}, {{prec:0x6b655b88}} and {{prec:0x586a2ed7}}, and distinguish {{prec:0x0263bd9a}} and {{prec:0x844fe527}}.</p>
+  <div class="callout"><p><strong>Open, not decisive:</strong> in each, the silo's identity is derived from logs and code, not read from storage, and the vault's storage, such as its roles and claimable amounts, isn't readable with <code>arbot</code>. If the Council finds a silo link unproven, {{prec:0x0263bd9a}} is the closest adverse authority. Each draft flags for SafeDAO whether moving a Safe's own shares into a protocol escrow is value sent to a recipient under R-4.3.</p></div>
+</section>
+
+<section class="group">
+  <div class="group-head"><h2>A return of the Safe's only inflow</h2><span class="pill secure">secure, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:3296fc227b79}} (Ethereum, nonce 2)</h3>
+      <ul>
+        <li><strong>Call:</strong> <code>transfer</code> of 1000000000000000000 of {{addr:1:0xe6bfd33f52d82ccb5b37e16d3dd81f9ffdabb195}} (claims <code>SXT</code>) to {{addr:1:0x738e8e6a0212d9f9f207f37a46c89e6abaa149d3}}, the Safe {{addr:1:0xd8189b95dfb80c19401ca8d26582705138227103}}'s whole balance of it.</li>
+        <li><strong>Link:</strong> the recipient sent the Safe exactly that amount of the same token in {{tx:1:0x016d549acdc640f4e26e9249b5e5e60bac2dc684fda5d781d77bb5d0e205e5f9}}, the only transfer into the Safe. The recipient is itself a Safe 1.5.0 with the Safe's own proxy code, created about 32 days before the proposal, and shares 4 of 5 owners, which carry no weight ({{prec:0x8b83aa12}}).</li>
+        <li><strong>Precedents:</strong> applies {{prec:0xa350b558}} and {{prec:0x3d837c9e}} (exact native returns), {{prec:0x8b83aa12}}, {{prec:0x4ede043b}} and {{prec:0xe10abd9e}} (smaller same-token returns); distinguishes {{prec:0x97e39ea3}}, whose test is the same token and no more than came in.</li>
+        <li><strong>Draft:</strong> secure, accepted in the first judgment. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:3296fc227b79}}:</strong> two gaps are decisive and open. No <code>arbot</code> command checks public security flags or labels on the recipient, and the owners' relationship and the transfer's purpose are offchain. A flag, or a hostile control relationship, would reverse the draft. Etherscan's unconfirmed token listing also shows the same amount reaching the recipient from a third party in the block of its transfer to the Safe.</p></div>
+</section>
+
+<section class="group">
+  <div class="group-head"><h2>A payment to a recurring payee</h2><span class="pill secure">secure, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} and {{sentinel:0x101d59dbb8c5e70f45d52634f23800fca4fbe031}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:5d7d0c00a4a5}} (Ethereum, nonce 1537)</h3>
+      <ul>
+        <li><strong>Call:</strong> <code>transfer</code> of 45000000000 {{addr:1:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48}} to {{addr:1:0x8b3f1adad77a3b072130beef5e1d23583b5321ed}} from the Safe {{addr:1:0x5f2476454a1b05b514154c45e556795d2ddc3113}}.</li>
+        <li><strong>History:</strong> 1537 executions, complete and confirmed onchain; 17 of them paid this recipient USDC, from nonce 158 to nonce 1242, one of the same amount.</li>
+        <li><strong>Lookalike:</strong> Etherscan lists 600-unit USDC transfers to the recipient from {{addr:1:0x5f24be2c7bd5880536bc5bd4b03c0a8607133113}}, which shares the Safe's first and last 4 hex digits. They began after the Safe's payments and resemble the Safe, not the recipient.</li>
+        <li><strong>Precedents:</strong> applies {{prec:0x1db9eff8}}, {{prec:0x998b9630}}, {{prec:0x98b1cf86}} (the same Safe, at nonce 1482) and {{prec:0x5d05c971}}; distinguishes {{prec:0xac006728}} and {{prec:0x82c7a6da}}.</li>
+        <li><strong>Draft:</strong> secure, accepted in the first judgment. Human review isn't flagged.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="group">
+  <div class="group-head"><h2>A swap whose recipient isn't decoded</h2><span class="pill open">no case accepted, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:2d0174daa69d}} (Ethereum, nonce 34)</h3>
+      <ul>
+        <li><strong>Call:</strong> a MultiSendCallOnly batch from the Safe {{addr:1:0xf9f7fc9d416a75331c1589e5b1c685db5047e5d2}}: <code>approve</code> of its whole 700000000000000000 {{addr:1:0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee|weETH}} to the router {{addr:1:0x6a000f20005980200259b80c5102003040001068}}, then <code>swapExactAmountInOnCurveV1</code>.</li>
+        <li><strong>Where value goes:</strong> by the router's verified code, to the tuple field <code>beneficiary</code>, or to the Safe if it is zero, with fees to a partner named in <code>partnerAndFee</code>. <code>arbot</code> can't decode the tuple, and its trace shows no transfer recipients. An account with no link to the Safe, {{addr:1:0x08a3c2a819e3de7aca384c798269b3ce1cd0e437}}, appears in the swap's data with an unknown role.</li>
+        <li><strong>History:</strong> 34 executions, complete; the Safe used the same router at nonce 15 and got WETH back.</li>
+        <li><strong>Cases:</strong> <code>insecure</code> by the § 3.8 tie-break, thrown out because the payload answers the question; a provisional <code>secure</code>, thrown out because § 3.7 needs the rule passed and the Charter has no provisional ruling.</li>
+        <li><strong>Draft:</strong> no case accepted in 2 judgments; the judge advised against another round on the same record. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:2d0174daa69d}}:</strong> decode the swap call's <code>beneficiary</code> and <code>partnerAndFee</code> fields from the calldata. If <code>beneficiary</code> is zero or the Safe, the Safe receives the output, which points to <code>secure</code>. If it is {{addr:1:0x08a3c2a819e3de7aca384c798269b3ce1cd0e437}} or another unlinked account, the last case says {{prec:0x12e1aabb}} and {{prec:0x844fe527}} are close, which points to <code>insecure</code>. The request ID as first given differed in its 13th hex digit; this is the <code>FROZEN</code> request.</p></div>
+</section>
+
+<section>
+  <h2>Notes</h2>
+  <ul>
+    <li><strong>Gaps in <code>arbot</code> that decided outcomes.</strong>
+      <ul>
+        <li>There is no source of public security flags or labels (§ 2.7). No trusted, free provider is known.</li>
+        <li>It can't make a view call to, or read the storage of, an arbitrary contract, such as a router's owner or facets.</li>
+        <li>It can't give the time of a past block.</li>
+        <li>It can't decode an argument that is a tuple, such as a swap's <code>beneficiary</code>, or show a simulation's logs, so it can't say who a swap pays.</li>
+      </ul>
+      The last three are candidates for the <code>add-evidence</code> skill.</li>
+    <li><strong>How these were run.</strong> Precedents were checked against the 70 rulings of upstream <code>main</code>'s corpus. The newer drafts use Etherscan through a configured API key; its listings are offchain, and the drafts label what the chain doesn't confirm. The Safe Transaction Service now has a key too, but still answered 429 at times; the drafts' facts come from runs that succeeded. Of the public Arbitrum RPCs, only Blast's served old state for <code>0x863d…</code>.</li>
+  </ul>
+</section>
+

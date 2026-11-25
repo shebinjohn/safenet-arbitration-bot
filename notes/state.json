@@ -1,0 +1,130 @@
+{
+  "lastChecked": {
+    "time": "2026-11-25T08:01:57Z",
+    "gnosisBlock": 49458567,
+    "corpusBlock": 49457733,
+    "corpusRulings": 70
+  },
+  "docket": "https://claude.ai/artifact/2rFWUeyvtE3v1f5ZWvc5SV",
+  "requests": [
+    {
+      "id": "0x863d07a43e2ceaf3f2ffe84f37eaf9b3f5da36b0806bce181f3dd8b1f9073951",
+      "short": "863d07a43e2c",
+      "chainId": 42161,
+      "safe": "0x3efc972c8c5a9c9c443cfe482189a6c279c6b0bc",
+      "nonce": 0,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "not accepted",
+      "decidedBy": "3 judgments, all thrown out",
+      "onchainState": "FROZEN",
+      "deadline": 49914277,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0xd39dc3a746b99025aea3c2b72d8a99e22fc56b23f35bbc870c457a70d7a5faf4",
+      "short": "d39dc3a746b9",
+      "chainId": 1,
+      "safe": "0xab707431d416b8495825e89c0dc41c4502e1242c",
+      "nonce": 2,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "secure",
+      "decidedBy": "Accepted case, third judgment",
+      "onchainState": "FROZEN",
+      "deadline": 49926337,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0xf8a4d29019bef4fffac973bdb07bde83bb8b5275a6b35c1cbe420ea0d7e4e7ab",
+      "short": "f8a4d29019be",
+      "chainId": 1,
+      "safe": "0x14326e0664631430fe7187c826041e732629dedd",
+      "nonce": 10,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "onchainState": "FROZEN",
+      "deadline": 49929146,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0xb2aaafd43fb765f57ce6e0bced137080a4820faad4fb4d1e0e6a5499c1a5face",
+      "short": "b2aaafd43fb7",
+      "chainId": 1,
+      "safe": "0x3579d761025f9c755f997dfa7749775b0adebae7",
+      "nonce": 4,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "onchainState": "FROZEN",
+      "deadline": 49928201,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0x3296fc227b790dcc866b4d5060408027c725e6a8c60bc8f262e87c35d75586cd",
+      "short": "3296fc227b79",
+      "chainId": 1,
+      "safe": "0xd8189b95dfb80c19401ca8d26582705138227103",
+      "nonce": 2,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1; human review",
+      "onchainState": "FROZEN",
+      "deadline": 49930673,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0x5d7d0c00a4a573d86a1bd618d7e7516c2a36da7c7252facfe8fd0e327cf57ad1",
+      "short": "5d7d0c00a4a5",
+      "chainId": 1,
+      "safe": "0x5f2476454a1b05b514154c45e556795d2ddc3113",
+      "nonce": 1537,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "onchainState": "FROZEN",
+      "deadline": 49929895,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0x2d0174daa69d7c4d9ad46dd6099e17f069a1f016ae4e797321fda98169e05898",
+      "short": "2d0174daa69d",
+      "chainId": 1,
+      "safe": "0xf9f7fc9d416a75331c1589e5b1c685db5047e5d2",
+      "nonce": 34,
+      "disputedRules": [
+        "R-4.3"
+      ],
+      "draft": "not accepted",
+      "decidedBy": "2 judgments, both thrown out",
+      "onchainState": "FROZEN",
+      "deadline": 49927134,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    }
+  ]
+}

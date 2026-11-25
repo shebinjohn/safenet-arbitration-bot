@@ -1,0 +1,348 @@
+<title>Safenet Arbitration Docket</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: one docket column. Summary first, then a section per group of related requests, then cross-cutting notes. A request ID opens its full draft ruling in the same column. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2330;
+  --muted: #5b6575;
+  --line: #d9dde4;
+  --accent: #2d5bd7;
+  --secure: #1f7a4d;
+  --secure-bg: #e3f3ea;
+  --insecure: #b3261e;
+  --insecure-bg: #fbe5e3;
+  --open: #8a5a00;
+  --open-bg: #fbefd6;
+  --code-bg: #eef1f5;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e4e8ee; --muted: #9aa4b3; --line: #2c3440;
+    --accent: #8eadff; --secure: #6fd3a0; --secure-bg: #17352a; --insecure: #ff8a80; --insecure-bg: #3d1d1b;
+    --open: #f2c165; --open-bg: #3a2c10; --code-bg: #232a35; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e4e8ee; --muted: #9aa4b3; --line: #2c3440;
+  --accent: #8eadff; --secure: #6fd3a0; --secure-bg: #17352a; --insecure: #ff8a80; --insecure-bg: #3d1d1b;
+  --open: #f2c165; --open-bg: #3a2c10; --code-bg: #232a35; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+#docket td a.mono { white-space: nowrap; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+main { max-width: 1080px; margin: 0 auto; }
+#docket, #report-view { display: flex; flex-direction: column; gap: 40px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: 2.1rem; }
+h2 { font-size: 1.45rem; }
+h3 { font-size: 1.1rem; }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a.mono { overflow-wrap: anywhere; }
+.muted { color: var(--muted); font-size: 0.85em; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+header { display: flex; flex-direction: column; gap: 10px; }
+.lede { color: var(--muted); font-size: 1.02rem; }
+.tally { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.tally span { padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+.secure { background: var(--secure-bg); color: var(--secure); }
+.insecure { background: var(--insecure-bg); color: var(--insecure); }
+.open { background: var(--open-bg); color: var(--open); }
+section { display: flex; flex-direction: column; gap: 14px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+#docket table { min-width: 1080px; }
+td.votes { white-space: nowrap; font-size: 0.82rem; }
+td.votes a { font-weight: 600; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--surface); }
+tr:last-child td { border-bottom: none; }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 0.82rem; white-space: nowrap; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 80ch; }
+.callout { border-left: 3px solid var(--open); padding: 10px 14px; background: var(--open-bg); border-radius: 0 6px 6px 0; }
+.callout p { color: var(--fg); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.two > div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction: column; gap: 6px; }
+
+/* Report view */
+.report-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.report-bar .spacer { flex: 1 1 auto; }
+.report-bar a.nav { font-weight: 600; text-decoration: none; }
+.report-bar .rid { font-family: var(--f-mono); font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
+.md { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.md h1 { font-size: 1.8rem; }
+.md h2 { font-size: 1.35rem; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.md h3 { font-size: 1.08rem; margin-top: 6px; }
+.md h4 { font-family: var(--f-display); font-size: 0.95rem; margin: 4px 0 0; }
+.md ul, .md ol { max-width: 86ch; }
+.md ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.md li > ul, .md li > ol { margin-top: 6px; }
+.md blockquote { margin: 0; padding: 10px 16px; border-left: 3px solid var(--line); background: var(--surface); border-radius: 0 6px 6px 0; display: flex; flex-direction: column; gap: 8px; }
+.md table { min-width: 640px; }
+.md td { font-size: 0.85rem; }
+.md pre { margin: 0; padding: 14px; background: var(--code-bg); border-radius: 8px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md pre code { background: none; padding: 0; font-size: 0.8rem; }
+.md hr { border: none; border-top: 1px solid var(--line); width: 100%; }
+.status { color: var(--muted); }
+.sentinel-name { font-weight: 600; font-size: 0.85em; }
+ul.signed-list a.mono { font-size: 0.8rem; }
+button.dl { font: inherit; font-size: 0.8rem; font-weight: 600; color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+button.dl:hover { border-color: var(--accent); }
+button.dl:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.dl:disabled { cursor: default; opacity: 0.6; }
+p.signed { color: var(--muted); font-size: 0.88rem; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<main>
+<div id="docket">
+<header>
+  <div class="eyebrow">Safenet Security Council · Draft rulings for review · {{DATE}}</div>
+  <h1>Safenet Arbitration Docket</h1>
+  <p class="lede">{{LEDE}}</p>
+  <div class="tally">
+{{TALLY}}
+  </div>
+</header>
+
+<section>
+  <h2>Docket</h2>
+  <p>{{DOCKET_INTRO}}</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Request</th><th>Safe · nonce</th><th>Proposed (UTC)</th><th>Disputed</th><th>Votes</th><th>Draft</th><th>Decided by</th><th>Onchain action</th><th>Deadline</th><th>Report</th></tr></thead>
+    <tbody>
+{{ROWS}}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{{SECTIONS}}
+<footer>
+  <div>The Download buttons save a request’s draft ruling as a Markdown file, after you confirm. Each request ID above opens that request's full draft ruling, with its Charter quotations, material evidence, precedents and draft <code>context</code>. Links to addresses, transactions and blocks open Etherscan for Ethereum Mainnet, Arbiscan for Arbitrum One and Gnosisscan for Gnosis Chain. Precedent IDs link to the Council's ruling transaction.</div>
+  <div>Sentinel names are from the current participant set in the <a href="https://docs.safefoundation.org/safenet-aegis/governance/participant-selection#current-participant-set" target="_blank" rel="noopener">Safe Foundation's documentation</a>, observed {{SENTINELS_OBSERVED}}. An address outside that set shows without a name.</div>
+  <div>Every fact in these drafts comes from <code>arbot</code> output that the oversight agent checked, except where a draft names a gap.</div>
+</footer>
+</div>
+
+<div id="report-view" hidden>
+  <div class="report-bar">
+    <a class="nav" href="#docket">← Docket</a>
+    <span id="report-pill"></span>
+    <span class="rid" id="report-rid"></span>
+    <button type="button" class="dl" id="report-dl" hidden>Download</button>
+    <span class="spacer"></span>
+    <a class="nav" id="report-prev" href="#docket">‹ Previous</a>
+    <a class="nav" id="report-next" href="#docket">Next ›</a>
+  </div>
+  <article class="md" id="report-body"><p class="status">Loading the draft ruling…</p></article>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+(function () {
+  var REPORTS = {{REPORTS_JSON}};
+  var VERDICTS = {{VERDICTS_JSON}};
+  var PRECEDENTS = {{PRECEDENTS_JSON}};
+  var EXPLORERS = {{EXPLORERS_JSON}};
+  var SENTINELS = {{SENTINELS_JSON}};
+  var ORDER = Object.keys(REPORTS);
+  var docket = document.getElementById("docket");
+  var view = document.getElementById("report-view");
+  var body = document.getElementById("report-body");
+  var cache = {};
+
+  function slug(text) {
+    return text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
+  }
+
+  function explorerLink(href, text, title) {
+    var link = document.createElement("a");
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener";
+    if (title) link.title = title;
+    link.className = "mono";
+    link.textContent = text;
+    return link;
+  }
+
+  // Links a code span that holds a request ID of the docket, a corpus precedent, or an Ethereum address.
+  function linkCode(code) {
+    if (code.closest("a, pre")) return;
+    var text = code.textContent.trim();
+    var m = /^0x([0-9a-fA-F]{8,64})\u2026?$/.exec(text);
+    if (!m) return;
+    var hex = m[1].toLowerCase();
+    var target = null;
+    if (hex.length === 40) {
+      // The fee token lives on Gnosis Chain, whatever the Safe's chain.
+      var ex = hex === "2a22f9c3b484c3629090feed35f17ff8f88f76f0" ? ["https://gnosisscan.io", "Gnosisscan"]
+        : (EXPLORERS[current] || ["https://etherscan.io", "Etherscan"]);
+      target = explorerLink(ex[0] + "/address/0x" + hex, text, ex[1]);
+    } else {
+      var docketHit = ORDER.filter(function (d) { return REPORTS[d].slice(2).indexOf(hex) === 0; });
+      if (docketHit.length === 1 && docketHit[0] !== current) {
+        target = document.createElement("a");
+        target.href = "#r-" + docketHit[0];
+        target.className = "mono";
+        target.textContent = text;
+      } else {
+        var precHits = Object.keys(PRECEDENTS).filter(function (id) { return id.slice(2).toLowerCase().indexOf(hex) === 0; });
+        if (precHits.length === 1) {
+          target = explorerLink("https://gnosisscan.io/tx/" + PRECEDENTS[precHits[0]], text, "Council ruling transaction");
+        }
+      }
+    }
+    if (target) code.replaceWith(target);
+  }
+
+  function enhance() {
+    body.querySelectorAll("h1, h2, h3, h4").forEach(function (h) { h.id = "s-" + slug(h.textContent); });
+    body.querySelectorAll("a[href]").forEach(function (link) {
+      var href = link.getAttribute("href");
+      if (href.charAt(0) === "#") {
+        link.addEventListener("click", function (e) {
+          var heading = document.getElementById("s-" + href.slice(1));
+          if (heading) { e.preventDefault(); heading.scrollIntoView(); }
+        });
+      } else {
+        link.target = "_blank";
+        link.rel = "noopener";
+      }
+    });
+    body.querySelectorAll("table").forEach(function (table) {
+      var wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      table.parentNode.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    });
+    body.querySelectorAll("code").forEach(linkCode);
+    body.querySelectorAll('a[href*="/address/"]').forEach(function (link) {
+      var m = /\/address\/(0x[0-9a-fA-F]{40})/.exec(link.getAttribute("href"));
+      var name = m && SENTINELS[m[1].toLowerCase()];
+      if (!name || (link.nextSibling && link.nextSibling.className === "sentinel-name")) return;
+      var tag = document.createElement("span");
+      tag.className = "sentinel-name";
+      tag.textContent = " " + name;
+      link.parentNode.insertBefore(tag, link.nextSibling);
+    });
+  }
+
+  var current = null;
+
+  function loadReport(id) {
+    if (cache[id]) return Promise.resolve(cache[id]);
+    return fetch("reports/" + id + ".md")
+      .then(function (res) { if (!res.ok) throw new Error(res.status); return res.text(); })
+      .then(function (md) { cache[id] = md; return md; });
+  }
+
+  var downloads = null;
+
+  function download(button, id) {
+    if (!downloads) return;
+    var label = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparing\u2026";
+    loadReport(id)
+      .then(function (md) {
+        button.textContent = "Confirm in dialog";
+        return downloads.save({ filename: "safenet-draft-ruling-" + REPORTS[id] + ".md", data: md });
+      })
+      .then(function () { button.textContent = "Saved"; })
+      .catch(function (err) {
+        var code = err && err.code;
+        if (code === "declined") button.textContent = label;
+        else if (code === "rate_limited") button.textContent = "Try again";
+        else if (code === "unavailable" || code === "not_granted" || code === "capability_disabled" || code === "capability_removed") { button.hidden = true; }
+        else button.textContent = "Failed, try again";
+      })
+      .then(function () {
+        button.disabled = false;
+        if (button.textContent === "Saved") setTimeout(function () { button.textContent = label; }, 2500);
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var button = e.target.closest("button.dl");
+    if (!button) return;
+    var id = button.id === "report-dl" ? current : button.getAttribute("data-report");
+    if (id) download(button, id);
+  });
+
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(function (ns) {
+      downloads = ns;
+      if (ns) document.querySelectorAll("button.dl").forEach(function (b) { b.hidden = false; });
+    }).catch(function () {});
+  }
+
+  function showReport(id) {
+    current = id;
+    docket.hidden = true;
+    view.hidden = false;
+    var i = ORDER.indexOf(id);
+    var prev = document.getElementById("report-prev");
+    var next = document.getElementById("report-next");
+    prev.href = i > 0 ? "#r-" + ORDER[i - 1] : "#docket";
+    prev.textContent = i > 0 ? "‹ 0x" + ORDER[i - 1] : "‹ Docket";
+    next.href = i < ORDER.length - 1 ? "#r-" + ORDER[i + 1] : "#docket";
+    next.textContent = i < ORDER.length - 1 ? "0x" + ORDER[i + 1] + " ›" : "Docket ›";
+    var pill = document.getElementById("report-pill");
+    pill.className = "pill " + VERDICTS[id][0];
+    pill.textContent = VERDICTS[id][1];
+    document.getElementById("report-rid").textContent = REPORTS[id];
+    window.scrollTo(0, 0);
+    var render = function (md) {
+      if (current !== id) return;
+      body.innerHTML = DOMPurify.sanitize(marked.parse(md));
+      enhance();
+    };
+    if (cache[id]) { render(cache[id]); return; }
+    body.innerHTML = '<p class="status">Loading the draft ruling…</p>';
+    loadReport(id)
+      .then(render)
+      .catch(function () {
+        if (current === id) body.innerHTML = '<p class="status">This draft ruling didn’t load. Go back to the docket and select the request again.</p>';
+      });
+  }
+
+  function route() {
+    var h = location.hash.slice(1);
+    if (h.indexOf("r-") === 0 && REPORTS[h.slice(2)]) {
+      showReport(h.slice(2));
+    } else {
+      current = null;
+      view.hidden = true;
+      docket.hidden = false;
+    }
+  }
+
+  window.addEventListener("hashchange", route);
+  route();
+})();
+</script>
+

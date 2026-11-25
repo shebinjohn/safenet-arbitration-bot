@@ -111,3 +111,7 @@ pending for all, as of Gnosis block 49458567 (2026-11-25).
   upstream squash-merged revised versions of the stack's lower PRs (#23–#28 there).
   Built from `pr9-offchain-references` alone (2d0a289); `go test -short ./...`
   passed. The stack needs rebasing onto upstream `main`.
+- 2026-11-25 22:02 UTC: new request `0xc3f9a39d441f…` (Ethereum Safe
+  `0x659e…6022`, nonce 22, MultiSend delegate call, disputed R-4.4: BlockSec
+  deny, Candide approve; deadline block 49952029). Held by the sync gate: fork
+  `main` 1 behind upstream, and `pr9-offchain-references` conflicts in 31 files.

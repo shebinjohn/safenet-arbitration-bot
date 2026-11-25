@@ -1,8 +1,8 @@
 {
   "lastChecked": {
-    "time": "2026-11-25T08:01:57Z",
+    "time": "2026-11-25T22:03:13Z",
     "gnosisBlock": 49458567,
-    "corpusBlock": 49457733,
+    "corpusBlock": 49465452,
     "corpusRulings": 70
   },
   "docket": "https://claude.ai/artifact/2rFWUeyvtE3v1f5ZWvc5SV",
@@ -123,6 +123,23 @@
       "onchainState": "FROZEN",
       "deadline": 49927134,
       "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0xc3f9a39d441fff84a1e296ebc6d3bbe26188af4d760829996e489d078b295b73",
+      "short": "c3f9a39d441f",
+      "chainId": 1,
+      "safe": "0x659e3d25240731415b3f3ceb89d27f1169a66022",
+      "nonce": 22,
+      "disputedRules": [
+        "R-4.4"
+      ],
+      "draft": null,
+      "decidedBy": null,
+      "onchainState": "FROZEN",
+      "deadline": 49952029,
+      "docketStatus": "held: waiting for the user to sync the fork",
       "councilOutcome": null,
       "councilContext": null
     }

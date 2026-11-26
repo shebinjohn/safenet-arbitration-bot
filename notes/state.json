@@ -1,6 +1,6 @@
 {
   "lastChecked": {
-    "time": "2026-11-26T11:03:47Z",
+    "time": "2026-11-26T12:05:52Z",
     "gnosisBlock": 49458567,
     "corpusBlock": 49477242,
     "corpusRulings": 70
@@ -18,11 +18,18 @@
       ],
       "draft": "not accepted",
       "decidedBy": "3 judgments, all thrown out",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49914277,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "A Safe transaction already executed onchain before its proposal is prior onchain history under \u00a7 2.8; its payment places the recipient in the expected target set, so the transaction is secure under R-4.3.",
+        "saved": ".msgboard/863d07a43e2c/council-context.md (not committed)"
+      }
     },
     {
       "id": "0xd39dc3a746b99025aea3c2b72d8a99e22fc56b23f35bbc870c457a70d7a5faf4",
@@ -35,11 +42,18 @@
       ],
       "draft": "secure",
       "decidedBy": "Accepted case, third judgment",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49926337,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
+        "saved": ".msgboard/d39dc3a746b9/council-context.md (not committed)"
+      }
     },
     {
       "id": "0xf8a4d29019bef4fffac973bdb07bde83bb8b5275a6b35c1cbe420ea0d7e4e7ab",
@@ -52,11 +66,18 @@
       ],
       "draft": "secure",
       "decidedBy": "Accepted case, round 1",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49929146,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
+        "saved": ".msgboard/f8a4d29019be/council-context.md (not committed)"
+      }
     },
     {
       "id": "0xb2aaafd43fb765f57ce6e0bced137080a4820faad4fb4d1e0e6a5499c1a5face",
@@ -69,11 +90,18 @@
       ],
       "draft": "secure",
       "decidedBy": "Accepted case, round 1",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49928201,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
+        "saved": ".msgboard/b2aaafd43fb7/council-context.md (not committed)"
+      }
     },
     {
       "id": "0x3296fc227b790dcc866b4d5060408027c725e6a8c60bc8f262e87c35d75586cd",
@@ -86,11 +114,18 @@
       ],
       "draft": "secure",
       "decidedBy": "Accepted case, round 1; human review",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49930673,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "A young Safe returns to an address exactly the ERC-20 amount that address had sent it; the recipient is a prior counterparty inside the expected target set, secure under R-4.3.",
+        "saved": ".msgboard/3296fc227b79/council-context.md (not committed)"
+      }
     },
     {
       "id": "0x5d7d0c00a4a573d86a1bd618d7e7516c2a36da7c7252facfe8fd0e327cf57ad1",
@@ -103,11 +138,18 @@
       ],
       "draft": "secure",
       "decidedBy": "Accepted case, round 1",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49929895,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49477793,
+          "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
+        },
+        "summary": "USDC transfer to a recipient the Safe had paid five times before, with a non-recipient lookalike in its history; secure under R-4.3",
+        "saved": ".msgboard/5d7d0c00a4a5/council-context.md (not committed)"
+      }
     },
     {
       "id": "0x2d0174daa69d7c4d9ad46dd6099e17f069a1f016ae4e797321fda98169e05898",
@@ -156,7 +198,7 @@
       "decidedBy": null,
       "onchainState": "FROZEN",
       "deadline": 49961457,
-      "docketStatus": "held: waiting for the user to sync the fork",
+      "docketStatus": "arbitrating",
       "councilOutcome": null,
       "councilContext": null
     }

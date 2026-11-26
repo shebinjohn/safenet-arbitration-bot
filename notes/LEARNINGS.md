@@ -82,16 +82,16 @@ record the `arbot` gap.
 
 All under Charter `bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre`,
 disputed rule R-4.3, drafted 2026-11-23/24 (previous session). Council outcome:
-pending for all, as of Gnosis block 49458567 (2026-11-25).
+see the table and "Council outcomes" below.
 
 | Request | Chain · nonce | Pattern | Draft | Rounds / what was caught | Council outcome |
 | --- | --- | --- | --- | --- | --- |
-| `0x863d07a43e2c…` | 42161 · 0 | transfer executed 3 s before proposal | not accepted | 3 judgments thrown out; last case's § 6.4 departure misdescribed `0x1fcf9563…`; `0x4e701ce5…` found afterwards | pending |
-| `0xd39dc3a746b9…` | 1 · 2 | vault redeem (derUSDC) | secure | accepted on third judgment; two cases thrown out over the silo identification | pending |
-| `0xf8a4d29019be…` | 1 · 10 | vault redeem (derBTC) | secure | accepted round 1 | pending |
-| `0xb2aaafd43fb7…` | 1 · 4 | vault redeem (derEURC) | secure | accepted round 1 | pending |
-| `0x3296fc227b79…` | 1 · 2 | return of the Safe's only inflow (SXT) | secure, human review | accepted round 1; flags/labels gap decisive | pending |
-| `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | pending |
+| `0x863d07a43e2c…` | 42161 · 0 | transfer executed 3 s before proposal | not accepted | 3 judgments thrown out; last case's § 6.4 departure misdescribed `0x1fcf9563…`; `0x4e701ce5…` found afterwards | **secure** (record `0x74257d21…`) |
+| `0xd39dc3a746b9…` | 1 · 2 | vault redeem (derUSDC) | secure | accepted on third judgment; two cases thrown out over the silo identification | **secure** (record `0x74257d21…`) |
+| `0xf8a4d29019be…` | 1 · 10 | vault redeem (derBTC) | secure | accepted round 1 | **secure** (record `0x74257d21…`) |
+| `0xb2aaafd43fb7…` | 1 · 4 | vault redeem (derEURC) | secure | accepted round 1 | **secure** (record `0x74257d21…`) |
+| `0x3296fc227b79…` | 1 · 2 | return of the Safe's only inflow (SXT) | secure, human review | accepted round 1; flags/labels gap decisive | **secure** (record `0x74257d21…`) |
+| `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | **secure** (record `0x74257d21…`) |
 | `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | pending |
 | `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
 
@@ -160,3 +160,30 @@ pending for all, as of Gnosis block 49458567 (2026-11-25).
   `0x8888…f946`, disputed R-4.3: BlockSec deny, Candide approve; deadline block
   49961457). Held by the sync gate: fork `main` 1 corpus-index commit behind
   upstream, and `pr9-offchain-references` conflicts in 48 files.
+
+## Council outcomes
+
+### 2026-11-26: six requests ruled `secure` in one transaction
+
+Gnosis Chain transaction `0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a`
+(block 49477793) resolved 863d, d39d, f8a4, b2aa, 3296 and 5d7d `secure`
+(`RESOLVED_APPROVED`), all under R-4.3. The full `context` of each is saved in
+`.msgboard/<short-id>/council-context.md` (not committed). The corpus will carry them once
+upstream indexes past block 49477793.
+
+| Request | Draft | Council | Agreement |
+| --- | --- | --- | --- |
+| d39d, f8a4, b2aa | secure (vault redeem) | secure: "moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named" | match |
+| 3296 | secure, human review | secure: a young Safe returns exactly the amount the recipient sent it | match |
+| 5d7d | secure | secure: recipient paid five times before; non-recipient lookalike noted | match |
+| 863d | **not accepted** | secure: "A Safe transaction already executed onchain before its proposal is prior onchain history under § 2.8; its payment places the recipient in the expected target set" | Council decided what the agents couldn't |
+
+**Precedent conflict resolved (Charter issue #27).** The 863d ruling sides with
+`0x1fcf9563…`: a transaction's own execution before its proposal counts as prior
+history (§ 2.8). The `0x4e701ce5…` reading (own execution not considered) is now
+the minority view. Tell future agents to cite 863d once it is in the corpus.
+
+Lesson: the Council relied on the pre-proposal execution that three judge rounds
+refused to weigh. When the deciding question is a Charter interpretation with
+conflicting precedent, stop early and hand it to the Council as "not accepted"
+rather than spending rounds.

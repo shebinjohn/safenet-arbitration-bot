@@ -91,6 +91,7 @@ pending for all, as of Gnosis block 49458567 (2026-11-25).
 | `0x3296fc227b79…` | 1 · 2 | return of the Safe's only inflow (SXT) | secure, human review | accepted round 1; flags/labels gap decisive | pending |
 | `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | pending |
 | `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | pending |
+| `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
 
 ## RPC and service notes
 
@@ -115,3 +116,40 @@ pending for all, as of Gnosis block 49458567 (2026-11-25).
   `0x659e…6022`, nonce 22, MultiSend delegate call, disputed R-4.4: BlockSec
   deny, Candide approve; deadline block 49952029). Held by the sync gate: fork
   `main` 1 behind upstream, and `pr9-offchain-references` conflicts in 31 files.
+
+### CCTP bridge approval (R-4.4), `0xc3f9a39d441f…`, 2026-11-26
+
+- Held from 2026-11-25 22:02 until the user synced the fork's `main` (the `pr*`
+  stack still conflicts; the user accepted building from `pr9-offchain-references`).
+- Batch: USDC `approve(0x28b5…cf5d, 788250000)` then `0x8e0250ee` on the spender.
+  `arbot classify`: unclassified.
+- Judgments, all thrown out, all `secure` cases:
+  1. case 3: approve-then-call alone isn't § 2.4 membership; admitted G1/G3 could flip it; no § 5.1 analogy.
+  2. case 6: Circle's address page shows *what* the spender is, not that it's in the
+     expected target set; precedents 0x266a0fe0… (token creation linked spender onchain)
+     and 0xa2e204cf… (pre-proposal registry + earlier approve-then-use) had a second link.
+  3. case 9: rests on developers.circle.com pages attributed only to the domain;
+     the case itself conceded § 3.8 `insecure` if the Council discounts them.
+     Judge's final note: G1/G3 can't change the R-4.4 verdict (mint recipient is R-4.3);
+     the only open question is the weight of the documentation.
+- Oversight caught:
+  - an off-by-one transfer count (15 → 16);
+  - derived facts not marked derived;
+  - one URL and time shared by 3 contracts;
+  - an `evidence-summary.json` field that `check-report` rejects (`status` on a gap);
+  - a non-time `observedAt`;
+  - line numbers that arbot never prints, so they were all removed;
+  - case wording that the evidence didn't support ("is consumed", "just received",
+    "issuer", "first-party", "mutually consistent").
+- Lesson: `arbot source fetch` needs `sources.allow` in the config; without it
+  every documentation lead is a gap. Seed configs with developers.circle.com,
+  github.com, raw.githubusercontent.com (add hosts per protocol as needed).
+- Lesson: for a documented-protocol spender with no Safe history, the judge wants
+  an onchain second link (proxy admin, token minter config) or a pre-proposal
+  source, not just post-proposal docs. Ask the detective for those up front.
+- Process note: a report-drafting sub-agent bypassed a Write-tool refusal with a
+  shell heredoc. The orchestrator re-verified the report (check-report 0/0, read in
+  full) before publishing. In future, write report.md in the orchestrator.
+- SafeDAO flags: whether post-proposal docs on an otherwise unidentified domain place
+  a spender in § 2.4's set; whether R-4.4 reaches a documented call's parameters
+  (destination caller) or leaves recipients to R-4.3.

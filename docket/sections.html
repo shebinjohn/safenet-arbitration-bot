@@ -103,6 +103,25 @@
   <div class="callout"><p><strong>For the Council on {{req:2d0174daa69d}}:</strong> decode the swap call's <code>beneficiary</code> and <code>partnerAndFee</code> fields from the calldata. If <code>beneficiary</code> is zero or the Safe, the Safe receives the output, which points to <code>secure</code>. If it is {{addr:1:0x08a3c2a819e3de7aca384c798269b3ce1cd0e437}} or another unlinked account, the last case says {{prec:0x12e1aabb}} and {{prec:0x844fe527}} are close, which points to <code>insecure</code>. The request ID as first given differed in its 13th hex digit; this is the <code>FROZEN</code> request.</p></div>
 </section>
 
+<section class="group">
+  <div class="group-head"><h2>A bridge approval to a spender the Safe never used</h2><span class="pill open">no case accepted, R-4.4</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.4</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:c3f9a39d441f}} (Ethereum, nonce 22)</h3>
+      <ul>
+        <li><strong>Call:</strong> a MultiSendCallOnly batch from the Safe {{addr:1:0x659e3d25240731415b3f3ceb89d27f1169a66022}}: <code>approve</code> of 788250000 of {{addr:1:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48}} (claims <code>USDC</code>), 9610 base units below its balance, to {{addr:1:0x28b5a0e9c621a5badaa536219b3a228c8168cf5d}}, then a call to that spender with selector <code>0x8e0250ee</code>.</li>
+        <li><strong>Spender:</strong> a Sourcify-verified <code>AdminUpgradableProxy</code>. In the simulation it delegates to {{addr:1:0x555e272506c06e7e559d57418563742afe363ec8}}, verified as <code>TokenMessengerV2</code>, whose <code>0x8e0250ee</code> is <code>depositForBurn</code>. By its verified source, no argument of the call grants a permission over the Safe's assets; who receives the minted value is an R-4.3 question, which no sentinel cited.</li>
+        <li><strong>History:</strong> 22 executions, complete; none calls, approves or pays the spender or calls USDC. The Safe's only USDC is one incoming transfer of 788259610, about 21 hours before the proposal.</li>
+        <li><strong>Documentation:</strong> pages on developers.circle.com, observed after the proposal, list the spender as <code>TokenMessengerV2</code> on Ethereum and the token as USDC, and describe approving USDC and then calling <code>depositForBurn</code>, with an example on a testnet.</li>
+        <li><strong>Cases:</strong> three <code>secure</code> cases, thrown out over § 2.4: the first on the batch alone, the second on the address listing alone, the third on documentation attributed only to its domain.</li>
+        <li><strong>Draft:</strong> no case accepted in 3 judgments. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:c3f9a39d441f}}:</strong> the judge's final note says the undecoded arguments can't change the R-4.4 verdict, and the argument doesn't point to <code>insecure</code> either. The one question is how much weight the developers.circle.com pages carry under § 2.4, § 3.4 and § 3.8. If they make the spender the documented counterparty of a USDC approval, the last case gives <code>secure</code>. If not, the evidence is evenly balanced and the transaction <code>insecure</code>. Unlike {{prec:0x266a0fe0}} and {{prec:0xa2e204cf}}, there is no onchain link between token and spender and no source from before the proposal; an onchain read of the spender's admin, or of USDC's minter configuration, would settle it. Flagged for SafeDAO (§ 5.1). The Safe executed the transaction after the freeze; that is status only.</p></div>
+</section>
+
 <section>
   <h2>Notes</h2>
   <ul>
@@ -112,9 +131,10 @@
         <li>It can't make a view call to, or read the storage of, an arbitrary contract, such as a router's owner or facets.</li>
         <li>It can't give the time of a past block.</li>
         <li>It can't decode an argument that is a tuple, such as a swap's <code>beneficiary</code>, or show a simulation's logs, so it can't say who a swap pays.</li>
+        <li>It can't decode a call to a proxy with its implementation's ABI, or read a proxy's implementation and admin slots, as in {{req:c3f9a39d441f}}.</li>
       </ul>
-      The last three are candidates for the <code>add-evidence</code> skill.</li>
-    <li><strong>How these were run.</strong> Precedents were checked against the 70 rulings of upstream <code>main</code>'s corpus. The newer drafts use Etherscan through a configured API key; its listings are offchain, and the drafts label what the chain doesn't confirm. The Safe Transaction Service now has a key too, but still answered 429 at times; the drafts' facts come from runs that succeeded. Of the public Arbitrum RPCs, only Blast's served old state for <code>0x863d…</code>.</li>
+      The last four are candidates for the <code>add-evidence</code> skill.</li>
+    <li><strong>How these were run.</strong> Precedents were checked against the 70 rulings of upstream <code>main</code>'s corpus. The newer drafts use Etherscan through a configured API key; its listings are offchain, and the drafts label what the chain doesn't confirm. The Safe Transaction Service now has a key too, but still answered 429 at times; the drafts' facts come from runs that succeeded. Of the public Arbitrum RPCs, only Blast's served old state for <code>0x863d…</code>. For {{req:c3f9a39d441f}}, <code>arbot source fetch</code> read Circle's pages from an allowlist of developers.circle.com, github.com and raw.githubusercontent.com; each page is recorded with its URL, observation time and hash.</li>
   </ul>
 </section>
 

@@ -1,5 +1,5 @@
 {
-  "date": "24 November 2026",
+  "date": "26 November 2026",
   "sentinelsObserved": "24 November 2026",
   "sentinels": {
     "0x101d59dbb8c5e70f45d52634f23800fca4fbe031": "OpenCover",
@@ -8,12 +8,61 @@
     "0x6d081448c04d9ef7cf8ecf54207b1931ecc25312": "Candide"
   },
   "requests": [
-    {"id": "0x863d07a43e2ceaf3f2ffe84f37eaf9b3f5da36b0806bce181f3dd8b1f9073951", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "not accepted", "decidedBy": "3 judgments, all thrown out", "executed": "before the proposal"},
-    {"id": "0xd39dc3a746b99025aea3c2b72d8a99e22fc56b23f35bbc870c457a70d7a5faf4", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "secure", "decidedBy": "Accepted case, third judgment", "executed": "during voting"},
-    {"id": "0xf8a4d29019bef4fffac973bdb07bde83bb8b5275a6b35c1cbe420ea0d7e4e7ab", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "secure", "decidedBy": "Accepted case, round 1", "executed": "during voting"},
-    {"id": "0xb2aaafd43fb765f57ce6e0bced137080a4820faad4fb4d1e0e6a5499c1a5face", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "secure", "decidedBy": "Accepted case, round 1", "executed": "during voting"},
-    {"id": "0x3296fc227b790dcc866b4d5060408027c725e6a8c60bc8f262e87c35d75586cd", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "secure", "decidedBy": "Accepted case, round 1; human review", "executed": "after the freeze"},
-    {"id": "0x5d7d0c00a4a573d86a1bd618d7e7516c2a36da7c7252facfe8fd0e327cf57ad1", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "secure", "decidedBy": "Accepted case, round 1", "executed": "after the freeze"},
-    {"id": "0x2d0174daa69d7c4d9ad46dd6099e17f069a1f016ae4e797321fda98169e05898", "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre", "draft": "not accepted", "decidedBy": "2 judgments, both thrown out", "executed": "during voting"}
+    {
+      "id": "0x863d07a43e2ceaf3f2ffe84f37eaf9b3f5da36b0806bce181f3dd8b1f9073951",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "not accepted",
+      "decidedBy": "3 judgments, all thrown out",
+      "executed": "before the proposal"
+    },
+    {
+      "id": "0xd39dc3a746b99025aea3c2b72d8a99e22fc56b23f35bbc870c457a70d7a5faf4",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, third judgment",
+      "executed": "during voting"
+    },
+    {
+      "id": "0xf8a4d29019bef4fffac973bdb07bde83bb8b5275a6b35c1cbe420ea0d7e4e7ab",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "executed": "during voting"
+    },
+    {
+      "id": "0xb2aaafd43fb765f57ce6e0bced137080a4820faad4fb4d1e0e6a5499c1a5face",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "executed": "during voting"
+    },
+    {
+      "id": "0x3296fc227b790dcc866b4d5060408027c725e6a8c60bc8f262e87c35d75586cd",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1; human review",
+      "executed": "after the freeze"
+    },
+    {
+      "id": "0x5d7d0c00a4a573d86a1bd618d7e7516c2a36da7c7252facfe8fd0e327cf57ad1",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, round 1",
+      "executed": "after the freeze"
+    },
+    {
+      "id": "0x2d0174daa69d7c4d9ad46dd6099e17f069a1f016ae4e797321fda98169e05898",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "not accepted",
+      "decidedBy": "2 judgments, both thrown out",
+      "executed": "during voting"
+    },
+    {
+      "id": "0xc3f9a39d441fff84a1e296ebc6d3bbe26188af4d760829996e489d078b295b73",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "not accepted",
+      "decidedBy": "3 judgments, all thrown out",
+      "executed": "after the freeze"
+    }
   ]
 }

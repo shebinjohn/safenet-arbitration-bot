@@ -1,8 +1,8 @@
 {
   "lastChecked": {
-    "time": "2026-11-25T22:03:13Z",
+    "time": "2026-11-26T09:47:00Z",
     "gnosisBlock": 49458567,
-    "corpusBlock": 49465452,
+    "corpusBlock": 49470917,
     "corpusRulings": 70
   },
   "docket": "https://claude.ai/artifact/2rFWUeyvtE3v1f5ZWvc5SV",
@@ -135,11 +135,11 @@
       "disputedRules": [
         "R-4.4"
       ],
-      "draft": null,
-      "decidedBy": null,
+      "draft": "not accepted",
+      "decidedBy": "3 judgments, all thrown out",
       "onchainState": "FROZEN",
       "deadline": 49952029,
-      "docketStatus": "held: waiting for the user to sync the fork",
+      "docketStatus": "on docket",
       "councilOutcome": null,
       "councilContext": null
     }

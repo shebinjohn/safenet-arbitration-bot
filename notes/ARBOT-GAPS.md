@@ -34,3 +34,24 @@ Each gap lists where it mattered and a proposed command for the `add-evidence` s
 - **Proposed:** `arbot labels -request-file <path> <address>`, reading a trusted,
   free public label/flag source with URL and observation time. No suitable provider
   identified yet.
+
+## Decoding a proxy call with its implementation's ABI
+
+- **Mattered in:** `0xc3f9a39d441f…` (G1/G3: `depositForBurn` arguments on a
+  CCTP `TokenMessengerV2` proxy; `calls -abi` uses only the proxy's own ABI).
+- **Proposed:** `arbot calls -abi` and `arbot simulate -trace` follow a proxy to the
+  implementation (EIP-1967 slot or trace delegatecall) and decode with its verified
+  ABI; or an `-abi-from <address>` flag.
+
+## Reading proxy storage slots (EIP-1967 implementation/admin)
+
+- **Mattered in:** `0xc3f9a39d441f…` (G2; the judge named the spender's admin as the
+  onchain link that could settle § 2.4).
+- **Proposed:** `arbot storage -request-file <path> <address> <slot>` with named
+  slots `eip1967.implementation` / `eip1967.admin`, plus `arbot view` for `owner()`.
+
+## `arbot explorer` block ranges
+
+- **Mattered in:** `0xc3f9a39d441f…` (G4/G10: Etherscan listings capped at 10000,
+  no `-from-block`/`-to-block`, so a pre-`safeBlock` usage window can't be isolated).
+- **Proposed:** `-from-block`/`-to-block` on `arbot explorer txs` and `tokentx`.

@@ -1,9 +1,9 @@
 {
   "lastChecked": {
-    "time": "2026-11-26T18:25:21Z",
+    "time": "2026-11-26T20:03:20Z",
     "gnosisBlock": 49458567,
-    "corpusBlock": 49477242,
-    "corpusRulings": 70
+    "corpusBlock": 49484023,
+    "corpusRulings": 76
   },
   "docket": "https://claude.ai/artifact/2rFWUeyvtE3v1f5ZWvc5SV",
   "requests": [
@@ -28,7 +28,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "A Safe transaction already executed onchain before its proposal is prior onchain history under \u00a7 2.8; its payment places the recipient in the expected target set, so the transaction is secure under R-4.3.",
-        "saved": ".msgboard/863d07a43e2c/council-context.md (not committed)"
+        "saved": ".msgboard/863d07a43e2c/council-context.md (not committed)",
+        "corpusFile": "corpus/0x863d07a43e2ceaf3f2ffe84f37eaf9b3f5da36b0806bce181f3dd8b1f9073951.md"
       }
     },
     {
@@ -52,7 +53,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
-        "saved": ".msgboard/d39dc3a746b9/council-context.md (not committed)"
+        "saved": ".msgboard/d39dc3a746b9/council-context.md (not committed)",
+        "corpusFile": "corpus/0xd39dc3a746b99025aea3c2b72d8a99e22fc56b23f35bbc870c457a70d7a5faf4.md"
       }
     },
     {
@@ -76,7 +78,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
-        "saved": ".msgboard/f8a4d29019be/council-context.md (not committed)"
+        "saved": ".msgboard/f8a4d29019be/council-context.md (not committed)",
+        "corpusFile": "corpus/0xf8a4d29019bef4fffac973bdb07bde83bb8b5275a6b35c1cbe420ea0d7e4e7ab.md"
       }
     },
     {
@@ -100,7 +103,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "Vault claimSharesAndRequestRedeem moving the Safe's own shares into the vault's verified pending silo, with claims to the Safe and no receiver named; secure under R-4.3.",
-        "saved": ".msgboard/b2aaafd43fb7/council-context.md (not committed)"
+        "saved": ".msgboard/b2aaafd43fb7/council-context.md (not committed)",
+        "corpusFile": "corpus/0xb2aaafd43fb765f57ce6e0bced137080a4820faad4fb4d1e0e6a5499c1a5face.md"
       }
     },
     {
@@ -124,7 +128,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "A young Safe returns to an address exactly the ERC-20 amount that address had sent it; the recipient is a prior counterparty inside the expected target set, secure under R-4.3.",
-        "saved": ".msgboard/3296fc227b79/council-context.md (not committed)"
+        "saved": ".msgboard/3296fc227b79/council-context.md (not committed)",
+        "corpusFile": "corpus/0x3296fc227b790dcc866b4d5060408027c725e6a8c60bc8f262e87c35d75586cd.md"
       }
     },
     {
@@ -148,7 +153,8 @@
           "txHash": "0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a"
         },
         "summary": "USDC transfer to a recipient the Safe had paid five times before, with a non-recipient lookalike in its history; secure under R-4.3",
-        "saved": ".msgboard/5d7d0c00a4a5/council-context.md (not committed)"
+        "saved": ".msgboard/5d7d0c00a4a5/council-context.md (not committed)",
+        "corpusFile": "corpus/0x5d7d0c00a4a573d86a1bd618d7e7516c2a36da7c7252facfe8fd0e327cf57ad1.md"
       }
     },
     {

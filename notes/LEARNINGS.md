@@ -170,8 +170,8 @@ see the table and "Council outcomes" below.
 Gnosis Chain transaction `0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a`
 (block 49477793) resolved 863d, d39d, f8a4, b2aa, 3296 and 5d7d `secure`
 (`RESOLVED_APPROVED`), all under R-4.3. The full `context` of each is saved in
-`.msgboard/<short-id>/council-context.md` (not committed). The corpus will carry them once
-upstream indexes past block 49477793.
+`.msgboard/<short-id>/council-context.md` (not committed). They are in upstream's corpus as of index block 49484023
+(76 rulings, 2026-11-26 20:02 UTC), and can now be cited by ID.
 
 | Request | Draft | Council | Agreement |
 | --- | --- | --- | --- |

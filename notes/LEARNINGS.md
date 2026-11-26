@@ -6,11 +6,13 @@ on the docket artifact.
 
 ## Standing rules for each hourly run
 
-- **Sync gate.** Before arbitrating anything new, check that the fork
-  (shebinjohn/safenet-arbitration-bot) is in sync: its `main` equals upstream
-  (safe-research) `main`, and `pr9-offchain-references` merges cleanly onto upstream
-  `main`. If not, ask the user to sync the fork first, and don't start new
-  arbitrations until they have. Monitoring (pending, resolved checks) continues.
+- **Sync gate (updated 2026-11-26 by the user).** Before starting an arbitration,
+  if the fork's `main` is behind upstream (safe-research) `main`, fast-forward it
+  yourself (`git push origin upstream/main:refs/heads/main`, fast-forward only,
+  never force). The user durably authorized this. The `pr*` stack branches are
+  not covered: never push them. While `pr9-offchain-references` conflicts with
+  upstream `main`, build `arbot` from `pr9-offchain-references` as is (accepted by
+  the user for 0xc3f9…), and mention the conflict in the run's report.
 - **Resolved requests leave the docket automatically.** When `arbot info -json`
   shows a docket request is no longer `FROZEN` (resolved, out of scope, or timed
   out), remove it from the docket and republish without asking, and record the

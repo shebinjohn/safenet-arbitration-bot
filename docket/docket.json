@@ -21,6 +21,13 @@
       "draft": "not accepted",
       "decidedBy": "3 judgments, all thrown out",
       "executed": "after the freeze"
+    },
+    {
+      "id": "0xffa3c8072266bdf3981cb0de27f5684d9b9459c3e4d02231713e32a9af911ddc",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "not accepted",
+      "decidedBy": "Oversight limit; no judgment",
+      "executed": "during voting"
     }
   ]
 }

@@ -35,6 +35,24 @@
   <div class="callout"><p><strong>For the Council on {{req:c3f9a39d441f}}:</strong> the judge's final note says the undecoded arguments can't change the R-4.4 verdict, and the argument doesn't point to <code>insecure</code> either. The one question is how much weight the developers.circle.com pages carry under § 2.4, § 3.4 and § 3.8. If they make the spender the documented counterparty of a USDC approval, the last case gives <code>secure</code>. If not, the evidence is evenly balanced and the transaction <code>insecure</code>. Unlike {{prec:0x266a0fe0}} and {{prec:0xa2e204cf}}, there is no onchain link between token and spender and no source from before the proposal; an onchain read of the spender's admin, or of USDC's minter configuration, would settle it. Flagged for SafeDAO (§ 5.1). The Safe executed the transaction after the freeze; that is status only.</p></div>
 </section>
 
+<section class="group">
+  <div class="group-head"><h2>A router exit whose receiver isn't decoded</h2><span class="pill open">no case accepted, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:ffa3c8072266}} (Ethereum, nonce 1127)</h3>
+      <ul>
+        <li><strong>Call:</strong> one call, value 0, from the Safe {{addr:1:0x5435b8b0843206fa8fc99453a3112713e6f0fd46}} to {{addr:1:0x888888888889758f76e7103c6cbf23abbf58f946}}, Sourcify-verified as <code>PendleRouterV4</code>, with selector <code>0xf06a07a0</code>. In the simulation the router delegates it to the facet {{addr:1:0x1266261289d815650a6bcdb308766be36efa8149}}, verified with <code>exitPostExpToToken(address receiver, …)</code>.</li>
+        <li><strong>Where value goes:</strong> to the call's <code>receiver</code> argument, which <code>arbot</code> doesn't decode. The trace ends in a USDC <code>transfer</code> by the router, without its arguments.</li>
+        <li><strong>History:</strong> 1127 executions, complete; 149 call the router first. 14 earlier executions use the same selector, and each logs one <code>Transfer</code> to the Safe, but only 7 of them are USDC from the router. In 7 of the 14, accounts that <code>arbot</code> doesn't identify also end with tokens.</li>
+        <li><strong>Case:</strong> case 4 argued <code>secure</code>, a close case on that history. It didn't reach the judge: <code>oversight</code> found a problem in three checks in a row, the last one minor ("the same call" for the same selector).</li>
+        <li><strong>Draft:</strong> no case accepted. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:ffa3c8072266}}:</strong> decode the call's <code>receiver</code> argument from the calldata. If it is the Safe, or an account that the Safe has paid, the call is inside the expected target set, which points to <code>secure</code>. If it is another account, the transaction is <code>insecure</code> under R-4.3 unless other evidence places it inside. Without it, the Council weighs the Safe's history as the last case did, or follows {{prec:0x82c7a6da}} in requiring address-specific evidence of the recipient. Flagged for SafeDAO (§ 5.1). The Safe executed the transaction one block after the Safe block; that is status only.</p></div>
+</section>
+
 <section>
   <h2>Notes</h2>
   <ul>
@@ -44,8 +62,8 @@
         <li>There is no source of public security flags or labels (§ 2.7). No trusted, free provider is known.</li>
         <li>It can't make a view call to, or read the storage of, an arbitrary contract, such as a router's owner or facets.</li>
         <li>It can't give the time of a past block.</li>
-        <li>It can't decode an argument that is a tuple, such as a swap's <code>beneficiary</code>, or show a simulation's logs, so it can't say who a swap pays.</li>
-        <li>It can't decode a call to a proxy with its implementation's ABI, or read a proxy's implementation and admin slots, as in {{req:c3f9a39d441f}}.</li>
+        <li>It can't decode an argument that is a tuple, such as a swap's <code>beneficiary</code>, or show a simulation's logs or the arguments of its calls, so it can't say who a swap or exit pays.</li>
+        <li>It can't decode a call to a proxy with its implementation's ABI, or read a proxy's implementation and admin slots, as in {{req:c3f9a39d441f}} and {{req:ffa3c8072266}}.</li>
       </ul>
       The last four are candidates for the <code>add-evidence</code> skill.</li>
     <li><strong>How these were run.</strong> Precedents were checked against the 70 rulings of upstream <code>main</code>'s corpus. The newer drafts use Etherscan through a configured API key; its listings are offchain, and the drafts label what the chain doesn't confirm. The Safe Transaction Service now has a key too, but still answered 429 at times; the drafts' facts come from runs that succeeded. Of the public Arbitrum RPCs, only Blast's served old state for <code>0x863d…</code>. For {{req:c3f9a39d441f}}, <code>arbot source fetch</code> read Circle's pages from an allowlist of developers.circle.com, github.com and raw.githubusercontent.com; each page is recorded with its URL, observation time and hash.</li>

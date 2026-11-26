@@ -1,6 +1,6 @@
 {
   "lastChecked": {
-    "time": "2026-11-26T12:05:52Z",
+    "time": "2026-11-26T13:14:10Z",
     "gnosisBlock": 49458567,
     "corpusBlock": 49477242,
     "corpusRulings": 70
@@ -194,10 +194,27 @@
       "disputedRules": [
         "R-4.3"
       ],
+      "draft": "not accepted",
+      "decidedBy": "Oversight limit; no judgment",
+      "onchainState": "FROZEN",
+      "deadline": 49961457,
+      "docketStatus": "on docket",
+      "councilOutcome": null,
+      "councilContext": null
+    },
+    {
+      "id": "0xa7682c0359629555e3e5166cd603cc18b00e7d4804b845f60ece8627f92023ea",
+      "short": "a7682c035962",
+      "chainId": 1,
+      "safe": "0x77bfbb13ea59877802e4c3487d0a91bce14e9e14",
+      "nonce": 19,
+      "disputedRules": [
+        "R-4.3"
+      ],
       "draft": null,
       "decidedBy": null,
       "onchainState": "FROZEN",
-      "deadline": 49961457,
+      "deadline": 49962318,
       "docketStatus": "arbitrating",
       "councilOutcome": null,
       "councilContext": null

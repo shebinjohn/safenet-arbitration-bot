@@ -1,5 +1,9 @@
 # Evidence `arbot` couldn't provide
 
+**Priority:** decoding calls through proxies/facets and tuples, and the arguments
+or logs of a simulation trace, decided three "not accepted" outcomes in a row
+(2d01, c3f9, ffa3).
+
 Each gap lists where it mattered and a proposed command for the `add-evidence` skill.
 
 ## Decoding tuple and struct arguments; simulation logs and transfer recipients
@@ -37,7 +41,8 @@ Each gap lists where it mattered and a proposed command for the `add-evidence` s
 
 ## Decoding a proxy call with its implementation's ABI
 
-- **Mattered in:** `0xc3f9a39d441f…` (G1/G3: `depositForBurn` arguments on a
+- **Mattered in:** `0xffa3c8072266…` (G1/G2: Pendle RouterV4 facet
+  `exitPostExpToToken` `receiver` undecoded; decided the outcome), `0xc3f9a39d441f…` (G1/G3: `depositForBurn` arguments on a
   CCTP `TokenMessengerV2` proxy; `calls -abi` uses only the proxy's own ABI).
 - **Proposed:** `arbot calls -abi` and `arbot simulate -trace` follow a proxy to the
   implementation (EIP-1967 slot or trace delegatecall) and decode with its verified

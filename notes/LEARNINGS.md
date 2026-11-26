@@ -93,6 +93,7 @@ see the table and "Council outcomes" below.
 | `0x3296fc227b79…` | 1 · 2 | return of the Safe's only inflow (SXT) | secure, human review | accepted round 1; flags/labels gap decisive | **secure** (record `0x74257d21…`) |
 | `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | **secure** (record `0x74257d21…`) |
 | `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | pending |
+| `0xffa3c8072266…` | 1 · 1127 | Pendle RouterV4 `exitPostExpToToken`, receiver undecoded | not accepted | 2 evidence, 3 oversight (all with findings), 0 judge; stopped at oversight limit | pending |
 | `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
 
 ## RPC and service notes
@@ -187,3 +188,28 @@ Lesson: the Council relied on the pre-proposal execution that three judge rounds
 refused to weigh. When the deciding question is a Charter interpretation with
 conflicting precedent, stop early and hand it to the Council as "not accepted"
 rather than spending rounds.
+
+### Pendle router exit (R-4.3), `0xffa3c8072266…`, 2026-11-26
+
+- One call to `PendleRouterV4` (Sourcify, exact), delegated in the simulation to the
+  `ActionMiscV3` facet's `exitPostExpToToken(address receiver, …)`. The `receiver` is
+  undecoded (G1: `calls -abi` uses the proxy's empty ABI; G2: trace has no args).
+- Strong history: 1127 executions, 149 to the router, 14 with the same selector.
+  `arbot events` on those 14: one logged Transfer to the Safe in each, only 7 of them
+  USDC from the router; third-party net recipients in 7. Half the pattern predates
+  the facet.
+- Prosecutor argued `secure` on the pattern, in a close case. Oversight found problems three times in a
+  row (status values check-report rejects; transfer counts that vary between runs
+  (591/590, 779/780) as the service's listing changes; "14 of 14 output", "same call",
+  "never as native value" overstatements), so per the skill it never reached the judge.
+  Report written by the orchestrator: check-report 0/0 first run.
+- Lessons:
+  - Tell the detective up front: no `arbot status` values in evidence files, and
+    say "a logged Transfer to the Safe", not "the output reached the Safe".
+  - Tell the prosecutor up front: "same selector and target", never "same call",
+    unless arguments are decoded.
+  - Service-listed transfer counts drift between runs; state them with the
+    observation time.
+- The Council can decode `receiver` from the calldata. arbot can't. This is the third
+  "not accepted" in a row (2d01, c3f9, ffa3) caused by proxy/facet or tuple decoding.
+  Top priority for `add-evidence`.

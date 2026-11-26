@@ -1,6 +1,6 @@
 {
   "lastChecked": {
-    "time": "2026-11-26T13:14:10Z",
+    "time": "2026-11-26T18:25:21Z",
     "gnosisBlock": 49458567,
     "corpusBlock": 49477242,
     "corpusRulings": 70
@@ -211,11 +211,11 @@
       "disputedRules": [
         "R-4.3"
       ],
-      "draft": null,
-      "decidedBy": null,
+      "draft": "secure",
+      "decidedBy": "Accepted case, second judgment",
       "onchainState": "FROZEN",
       "deadline": 49962318,
-      "docketStatus": "arbitrating",
+      "docketStatus": "on docket",
       "councilOutcome": null,
       "councilContext": null
     }

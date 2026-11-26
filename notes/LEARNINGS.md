@@ -94,6 +94,7 @@ see the table and "Council outcomes" below.
 | `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | **secure** (record `0x74257d21…`) |
 | `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | pending |
 | `0xffa3c8072266…` | 1 · 1127 | Pendle RouterV4 `exitPostExpToToken`, receiver undecoded | not accepted | 2 evidence, 3 oversight (all with findings), 0 judge; stopped at oversight limit | pending |
+| `0xa7682c035962…` | 1 · 19 | Lagoon vault `claimSharesAndRequestRedeem`, owner-created vault | **secure** | 3 evidence, 4 oversight, 2 judge; accepted in judgment 2 | pending |
 | `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
 
 ## RPC and service notes
@@ -213,3 +214,24 @@ rather than spending rounds.
 - The Council can decode `receiver` from the calldata. arbot can't. This is the third
   "not accepted" in a row (2d01, c3f9, ffa3) caused by proxy/facet or tuple decoding.
   Top priority for `add-evidence`.
+
+### Vault redeem (R-4.3), `0xa7682c035962…`, 2026-11-26: secure, accepted
+
+- Same `Vault` implementation `0xe505…dedf` as d39d/f8a4/b2aa (Council: secure today).
+  The vault was created by an owner of the Safe (who also created the Safe).
+- Judgment 1 threw out case 4: the silo was identified from logs only, the verdict was
+  called "tentative", and § 3.8's absence-of-evidence rule was used to cover the
+  recipient question. The judge suggested the cure: read the verified source for
+  where `pendingSilo` is set. It is assigned once in `__ERC7540_init`, reachable only
+  from an `initializer`. That plus the creation-tx `Approval` by the Silo and later
+  logs made the silo a *finding*; G10/G14 (stored value, upgrade history) were weighed
+  as minor ambiguity (§ 3.8 second rule), and judgment 2 accepted.
+- Lesson for vault redeems: ask the detective up front for (1) the `pendingSilo`
+  assignment and initializer guard from the verified source, (2) the creation-tx
+  logs, (3) later logs using the silo, (4) other users' same-selector calls as § 2.9.
+  Never call a verdict "tentative" (§ 2.13).
+- Process: a sub-agent run was cut off by the account's 5-hour usage limit at 13:20 UTC
+  (reset 17:20). Hourly runs 14:00–18:00 queued and were collapsed into one at 18:02.
+  The orchestrator wrote report.md; check-report 0/0 first run.
+- Corpus: upstream's index stayed at block 49477242 through 18:00 UTC, so the six
+  Council rulings of block 49477793 weren't citable yet.

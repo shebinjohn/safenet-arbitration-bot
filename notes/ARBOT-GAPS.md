@@ -50,7 +50,8 @@ Each gap lists where it mattered and a proposed command for the `add-evidence` s
 
 ## Reading proxy storage slots (EIP-1967 implementation/admin)
 
-- **Mattered in:** `0xc3f9a39d441f…` (G2; the judge named the spender's admin as the
+- **Mattered in:** `0xa7682c035962…` (G10/G14: the vault's stored `pendingSilo`
+  and the proxy's implementation history; weighed as minor ambiguity), `0xc3f9a39d441f…` (G2; the judge named the spender's admin as the
   onchain link that could settle § 2.4).
 - **Proposed:** `arbot storage -request-file <path> <address> <slot>` with named
   slots `eip1967.implementation` / `eip1967.admin`, plus `arbot view` for `owner()`.
@@ -60,3 +61,12 @@ Each gap lists where it mattered and a proposed command for the `add-evidence` s
 - **Mattered in:** `0xc3f9a39d441f…` (G4/G10: Etherscan listings capped at 10000,
   no `-from-block`/`-to-block`, so a pre-`safeBlock` usage window can't be isolated).
 - **Proposed:** `-from-block`/`-to-block` on `arbot explorer txs` and `tokentx`.
+
+## Listing an address's logs over a block range
+
+- **Mattered in:** `0xa7682c035962…` (G14: `Upgraded` events of a vault proxy between
+  creation and safeBlock; also decoding the `Upgraded(address)` topic, which the
+  detective read from memory).
+- **Proposed:** `arbot logs -request-file <path> -address <a> [-topic0 <sig>]
+  [-from-block N] [-to-block N]`, with well-known proxy events (`Upgraded`,
+  `AdminChanged`) added to `internal/events`.

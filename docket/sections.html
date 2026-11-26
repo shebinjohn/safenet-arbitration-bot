@@ -53,6 +53,23 @@
   <div class="callout"><p><strong>For the Council on {{req:ffa3c8072266}}:</strong> decode the call's <code>receiver</code> argument from the calldata. If it is the Safe, or an account that the Safe has paid, the call is inside the expected target set, which points to <code>secure</code>. If it is another account, the transaction is <code>insecure</code> under R-4.3 unless other evidence places it inside. Without it, the Council weighs the Safe's history as the last case did, or follows {{prec:0x82c7a6da}} in requiring address-specific evidence of the recipient. Flagged for SafeDAO (§ 5.1). The Safe executed the transaction one block after the Safe block; that is status only.</p></div>
 </section>
 
+<section class="group">
+  <div class="group-head"><h2>A vault redeem request</h2><span class="pill secure">secure, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x101d59dbb8c5e70f45d52634f23800fca4fbe031}} and {{sentinel:0xb28eb357bfa420c17bae3e6bfdb50094fb5babf2}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:a7682c035962}} (Ethereum, nonce 19)</h3>
+      <ul>
+        <li><strong>Call:</strong> <code>claimSharesAndRequestRedeem(uint256)</code> from the Safe {{addr:1:0x77bfbb13ea59877802e4c3487d0a91bce14e9e14}} on the Lagoon vault {{addr:1:0xfd104766499a3ff60ea85b5c6015ba9e32b8c891}}, whose implementation {{addr:1:0xe50554ec802375c9c3f9c087a8a7bb8c26d3dedf}} is Sourcify-verified as <code>Vault</code>. It names no recipient: claims go to the Safe, and the requested shares move to the vault's pending silo.</li>
+        <li><strong>Silo:</strong> {{addr:1:0x0efdab6588c62b9ed584172a419325007abd88d5}}, a verified <code>Silo</code>. The verified source assigns the silo once, in an initializer that can't run again, and the vault's creation and later logs, all before the Safe block, identify it.</li>
+        <li><strong>Link:</strong> the vault was created by {{addr:1:0x423ba0286c1f8ed6985180b61b3d81c013a48381}}, an owner of the Safe who also created the Safe. The Safe holds the vault's token, and two other users' identical calls moved their shares to the same silo.</li>
+        <li><strong>Draft:</strong> secure, accepted in the second judgment after the first case was thrown out over how the silo was identified. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:a7682c035962}}:</strong> this is the vault pattern that the Council ruled <code>secure</code> today in three requests, here on a vault that an owner of the Safe created. <code>arbot</code> can't read the vault's stored silo, or the proxy's history between creation and the Safe block; the draft weighs that as minor ambiguity, since no fact points to another recipient. The amount of shares and the Safe's whitelist state aren't shown either. Flagged for SafeDAO (§ 5.1).</p></div>
+</section>
+
 <section>
   <h2>Notes</h2>
   <ul>

@@ -28,6 +28,12 @@
       "draft": "not accepted",
       "decidedBy": "Oversight limit; no judgment",
       "executed": "during voting"
+    },
+    {
+      "id": "0xa7682c0359629555e3e5166cd603cc18b00e7d4804b845f60ece8627f92023ea",
+      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
+      "draft": "secure",
+      "decidedBy": "Accepted case, second judgment"
     }
   ]
 }

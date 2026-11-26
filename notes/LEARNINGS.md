@@ -153,3 +153,8 @@ pending for all, as of Gnosis block 49458567 (2026-11-25).
 - SafeDAO flags: whether post-proposal docs on an otherwise unidentified domain place
   a spender in § 2.4's set; whether R-4.4 reaches a documented call's parameters
   (destination caller) or leaves recipients to R-4.3.
+- 2026-11-26 11:03 UTC: new request `0xffa3c8072266…` (Ethereum Safe
+  `0x5435…fd46`, nonce 1127, a 15652-byte call with selector `0xf06a07a0` to
+  `0x8888…f946`, disputed R-4.3: BlockSec deny, Candide approve; deadline block
+  49961457). Held by the sync gate: fork `main` 1 corpus-index commit behind
+  upstream, and `pr9-offchain-references` conflicts in 48 files.

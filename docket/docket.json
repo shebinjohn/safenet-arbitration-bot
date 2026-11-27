@@ -1,5 +1,5 @@
 {
-  "date": "26 November 2026",
+  "date": "27 November 2026",
   "sentinelsObserved": "24 November 2026",
   "sentinels": {
     "0x101d59dbb8c5e70f45d52634f23800fca4fbe031": "OpenCover",
@@ -8,13 +8,6 @@
     "0x6d081448c04d9ef7cf8ecf54207b1931ecc25312": "Candide"
   },
   "requests": [
-    {
-      "id": "0x2d0174daa69d7c4d9ad46dd6099e17f069a1f016ae4e797321fda98169e05898",
-      "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",
-      "draft": "not accepted",
-      "decidedBy": "2 judgments, both thrown out",
-      "executed": "during voting"
-    },
     {
       "id": "0xc3f9a39d441fff84a1e296ebc6d3bbe26188af4d760829996e489d078b295b73",
       "charter": "bafkreigg6ajqdb52kb644wcxegurt7r6jlclru4mjy3lwxkbh6avm3vgre",

@@ -1,22 +1,4 @@
 <section class="group">
-  <div class="group-head"><h2>A swap whose recipient isn't decoded</h2><span class="pill open">no case accepted, R-4.3</span></div>
-  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
-  <div class="two">
-    <div>
-      <h3>{{req:2d0174daa69d}} (Ethereum, nonce 34)</h3>
-      <ul>
-        <li><strong>Call:</strong> a MultiSendCallOnly batch from the Safe {{addr:1:0xf9f7fc9d416a75331c1589e5b1c685db5047e5d2}}: <code>approve</code> of its whole 700000000000000000 {{addr:1:0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee|weETH}} to the router {{addr:1:0x6a000f20005980200259b80c5102003040001068}}, then <code>swapExactAmountInOnCurveV1</code>.</li>
-        <li><strong>Where value goes:</strong> by the router's verified code, to the tuple field <code>beneficiary</code>, or to the Safe if it is zero, with fees to a partner named in <code>partnerAndFee</code>. <code>arbot</code> can't decode the tuple, and its trace shows no transfer recipients. An account with no link to the Safe, {{addr:1:0x08a3c2a819e3de7aca384c798269b3ce1cd0e437}}, appears in the swap's data with an unknown role.</li>
-        <li><strong>History:</strong> 34 executions, complete; the Safe used the same router at nonce 15 and got WETH back.</li>
-        <li><strong>Cases:</strong> <code>insecure</code> by the § 3.8 tie-break, thrown out because the payload answers the question; a provisional <code>secure</code>, thrown out because § 3.7 needs the rule passed and the Charter has no provisional ruling.</li>
-        <li><strong>Draft:</strong> no case accepted in 2 judgments; the judge advised against another round on the same record. Human review required.</li>
-      </ul>
-    </div>
-  </div>
-  <div class="callout"><p><strong>For the Council on {{req:2d0174daa69d}}:</strong> decode the swap call's <code>beneficiary</code> and <code>partnerAndFee</code> fields from the calldata. If <code>beneficiary</code> is zero or the Safe, the Safe receives the output, which points to <code>secure</code>. If it is {{addr:1:0x08a3c2a819e3de7aca384c798269b3ce1cd0e437}} or another unlinked account, the last case says {{prec:0x12e1aabb}} and {{prec:0x844fe527}} are close, which points to <code>insecure</code>. The request ID as first given differed in its 13th hex digit; this is the <code>FROZEN</code> request.</p></div>
-</section>
-
-<section class="group">
   <div class="group-head"><h2>A bridge approval to a spender the Safe never used</h2><span class="pill open">no case accepted, R-4.4</span></div>
   <p>One <code>DENIED</code> vote cites <code>R-4.4</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x6d081448c04d9ef7cf8ecf54207b1931ecc25312}} approved.</p>
   <div class="two">
@@ -74,6 +56,7 @@
   <h2>Notes</h2>
   <ul>
     <li><strong>Settled since the last version.</strong> In Gnosis Chain transaction {{tx:100:0x74257d214ed898952641a08535edf1d303bd4dc6c1a79bb0b5e63d802feb706a}} (block 49477793), the Council ruled six requests of this docket <code>secure</code> under R-4.3 and removed them from arbitration: <code>0x863d07a43e2c…</code>, <code>0xd39dc3a746b9…</code>, <code>0xf8a4d29019be…</code>, <code>0xb2aaafd43fb7…</code>, <code>0x3296fc227b79…</code> and <code>0x5d7d0c00a4a5…</code>. Five match their drafts. For <code>0x863d07a43e2c…</code>, where no case was accepted, the Council held that a Safe transaction executed onchain before its proposal is prior onchain history under § 2.8, which places its recipient in the expected target set. That answers the precedent conflict the draft raised. The rulings join the corpus once indexed.</li>
+    <li><strong>Settled on 27 November.</strong> In Gnosis Chain transaction {{tx:100:0xed6c1608ea4dc9332f57a0596bea61cb79bb54efb95a3d5b3e53d55d4283f9dd}} (block 49498130), the Council ruled <code>0x2d0174daa69d…</code> <code>secure</code> under R-4.3, where no case had been accepted. It found the swap's <code>beneficiary</code> zero, so the verified router pays the output to the Safe, and relied on Velora's documentation of the router and the Safe's earlier use of it. That is the check the draft's callout asked for.</li>
     <li><strong>Gaps in <code>arbot</code> that decided outcomes.</strong>
       <ul>
         <li>There is no source of public security flags or labels (§ 2.7). No trusted, free provider is known.</li>

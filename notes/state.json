@@ -1,6 +1,6 @@
 {
   "lastChecked": {
-    "time": "2026-11-26T20:03:20Z",
+    "time": "2026-11-27T16:03:41Z",
     "gnosisBlock": 49458567,
     "corpusBlock": 49484023,
     "corpusRulings": 76
@@ -168,11 +168,18 @@
       ],
       "draft": "not accepted",
       "decidedBy": "2 judgments, both thrown out",
-      "onchainState": "FROZEN",
+      "onchainState": "RESOLVED_APPROVED",
       "deadline": 49927134,
-      "docketStatus": "on docket",
-      "councilOutcome": null,
-      "councilContext": null
+      "docketStatus": "removed: settled onchain",
+      "councilOutcome": "secure",
+      "councilContext": {
+        "record": {
+          "block": 49498130,
+          "txHash": "0xed6c1608ea4dc9332f57a0596bea61cb79bb54efb95a3d5b3e53d55d4283f9dd"
+        },
+        "summary": "Safe approves and swaps its weETH for WETH through Velora's documented Augustus v6.2 router with a zero beneficiary, which pays the output to the Safe; secure under R-4.3.",
+        "saved": ".msgboard/2d0174daa69d/council-context.md (not committed)"
+      }
     },
     {
       "id": "0xc3f9a39d441fff84a1e296ebc6d3bbe26188af4d760829996e489d078b295b73",

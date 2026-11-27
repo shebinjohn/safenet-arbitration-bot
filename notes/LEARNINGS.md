@@ -92,7 +92,7 @@ see the table and "Council outcomes" below.
 | `0xb2aaafd43fb7…` | 1 · 4 | vault redeem (derEURC) | secure | accepted round 1 | **secure** (record `0x74257d21…`) |
 | `0x3296fc227b79…` | 1 · 2 | return of the Safe's only inflow (SXT) | secure, human review | accepted round 1; flags/labels gap decisive | **secure** (record `0x74257d21…`) |
 | `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | **secure** (record `0x74257d21…`) |
-| `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | pending |
+| `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | **secure** (record `0xed6c1608…`) |
 | `0xffa3c8072266…` | 1 · 1127 | Pendle RouterV4 `exitPostExpToToken`, receiver undecoded | not accepted | 2 evidence, 3 oversight (all with findings), 0 judge; stopped at oversight limit | pending |
 | `0xa7682c035962…` | 1 · 19 | Lagoon vault `claimSharesAndRequestRedeem`, owner-created vault | **secure** | 3 evidence, 4 oversight, 2 judge; accepted in judgment 2 | pending |
 | `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
@@ -235,3 +235,21 @@ rather than spending rounds.
   The orchestrator wrote report.md; check-report 0/0 first run.
 - Corpus: upstream's index stayed at block 49477242 through 18:00 UTC, so the six
   Council rulings of block 49477793 weren't citable yet.
+
+### 2026-11-27: `0x2d0174daa69d…` ruled `secure`
+
+Record `0xed6c1608ea4dc9332f57a0596bea61cb79bb54efb95a3d5b3e53d55d4283f9dd` (Gnosis block
+49498130). The Council decoded the swap's `beneficiary` as zero, so the verified router
+pays the output to the Safe; it relied on Velora's documentation (docs.velora.xyz,
+"chains-and-contracts", observed 2026-11-26) and the Safe's earlier execution with the
+router (tx `0xa246291e…`, block 25136498). Precedents: 0xa2e204cf…, 0x6b655b88…
+applied; insecure R-4.3 rulings with unlinked recipients distinguished.
+
+Lessons:
+- The draft's callout ("decode `beneficiary`; zero means the Safe receives the output")
+  was exactly the Council's path. A "not accepted" draft that names the one deciding
+  check is useful.
+- The Council used an earlier router execution the agents had found but couldn't tie
+  to the output. With tuple decoding (ARBOT-GAPS) this would have been an accepted
+  `secure` draft. The same likely holds for `0xffa3…` (Pendle `receiver`).
+- Add docs.velora.xyz to `sources.allow` for aggregator cases.

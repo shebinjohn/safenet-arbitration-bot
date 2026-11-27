@@ -52,6 +52,23 @@
   <div class="callout"><p><strong>For the Council on {{req:a7682c035962}}:</strong> this is the vault pattern that the Council ruled <code>secure</code> today in three requests, here on a vault that an owner of the Safe created. <code>arbot</code> can't read the vault's stored silo, or the proxy's history between creation and the Safe block; the draft weighs that as minor ambiguity, since no fact points to another recipient. The amount of shares and the Safe's whitelist state aren't shown either. Flagged for SafeDAO (§ 5.1).</p></div>
 </section>
 
+<section class="group">
+  <div class="group-head"><h2>A second vault redeem by the same Safe</h2><span class="pill secure">secure, R-4.3</span></div>
+  <p>One <code>DENIED</code> vote cites <code>R-4.3</code>, from sentinel {{sentinel:0xc84a0928632382e75c543acced101b9525027362}}; {{sentinel:0x101d59dbb8c5e70f45d52634f23800fca4fbe031}} approved.</p>
+  <div class="two">
+    <div>
+      <h3>{{req:ac1e39678da5}} (Ethereum, nonce 24)</h3>
+      <ul>
+        <li><strong>Call:</strong> <code>claimSharesAndRequestRedeem(uint256)</code> from the same Safe {{addr:1:0x77bfbb13ea59877802e4c3487d0a91bce14e9e14}} on another Lagoon vault, {{addr:1:0xdeab363b122f9f4ff85ab32f6031b01800b01bc1}}, whose implementation {{addr:1:0x6c77c47fb8168e22976c3b0338cb1769c952249f}} is Sourcify-verified as <code>LagoonVault</code> v0.6.0. Claims go to the Safe; the requested shares move to the vault's pending silo.</li>
+        <li><strong>Silo:</strong> {{addr:1:0xae0fb9ba194058fc739f23d930791f463ab01a69}}. Unlike earlier vaults, it isn't verified at Sourcify, and its code differs from theirs. It is identified by the vault's verified compilation, which deploys a <code>Silo</code> with no payout function, by its constructor <code>Approval</code> in the vault's creation, and by Etherscan's verification record.</li>
+        <li><strong>Link:</strong> the vault was created by an owner of the Safe, the Safe holds its token, and at nonces 19 and 20 the Safe made the same kind of redeem on the other vault, each with a logged <code>Transfer</code> of its shares to a Sourcify-verified <code>Silo</code>.</li>
+        <li><strong>Draft:</strong> secure, accepted in the second judgment after the first was thrown out over the unverified silo. Human review required.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><p><strong>For the Council on {{req:ac1e39678da5}}:</strong> the silo's own code hasn't been compared with a <code>Silo</code> build artifact, and the vault's stored silo isn't read. The draft weighs both as no fact on the other side, following the Council's vault rulings {{prec:0xd39dc3a7}} and {{prec:0xb2aaafd4}}. If the Council gives the Safe's link no weight, {{prec:0x0263bd9a}} is the closer ruling. Flagged for SafeDAO (§ 5.1).</p></div>
+</section>
+
 <section>
   <h2>Notes</h2>
   <ul>

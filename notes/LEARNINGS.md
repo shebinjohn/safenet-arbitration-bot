@@ -94,6 +94,7 @@ see the table and "Council outcomes" below.
 | `0x5d7d0c00a4a5…` | 1 · 1537 | payment to recurring payee (USDC) | secure | accepted round 1; lookalike sender noted | **secure** (record `0x74257d21…`) |
 | `0x2d0174daa69d…` | 1 · 34 | swap, recipient tuple not decoded | not accepted | 2 judgments thrown out (§ 3.8 tie-break; provisional secure); request ID first given with a typo | **secure** (record `0xed6c1608…`) |
 | `0xffa3c8072266…` | 1 · 1127 | Pendle RouterV4 `exitPostExpToToken`, receiver undecoded | not accepted | 2 evidence, 3 oversight (all with findings), 0 judge; stopped at oversight limit | pending |
+| `0xac1e39678da5…` | 1 · 24 | Lagoon v0.6.0 vault redeem, same Safe as a768, unverified silo | **secure** | 2 evidence, 6 oversight, 2 judge; accepted in judgment 2 | pending |
 | `0xa7682c035962…` | 1 · 19 | Lagoon vault `claimSharesAndRequestRedeem`, owner-created vault | **secure** | 3 evidence, 4 oversight, 2 judge; accepted in judgment 2 | pending |
 | `0xc3f9a39d441f…` (R-4.4) | 1 · 22 | USDC approve + `depositForBurn` to Circle CCTP `TokenMessengerV2` proxy, spender never used | not accepted | 3 evidence, 7 oversight, 3 judge rounds; see below | pending |
 
@@ -253,3 +254,23 @@ Lessons:
   to the output. With tuple decoding (ARBOT-GAPS) this would have been an accepted
   `secure` draft. The same likely holds for `0xffa3…` (Pendle `receiver`).
 - Add docs.velora.xyz to `sources.allow` for aggregator cases.
+
+### Vault redeem v0.6.0 (R-4.3), `0xac1e39678da5…`, 2026-11-27: secure, accepted
+
+- Same Safe as a768, another Lagoon vault (`LagoonVault` v0.6.0 implementation
+  `0x6c77…249f`), created by an owner of the Safe. The silo `0xae0f…1a69` is not
+  Sourcify-verified, and its code hash differs from the v0.5.0 silos.
+- Judgment 1 threw out case 3: the silo was assumed to be escrow, and the link was weaker than the precedents'.
+  It named the cure. The detective then found: the silo code hash vs verified silos (differs);
+  Etherscan verifies it as `src/v0.6.0/Silo.sol` (offchain); the vault's verified
+  compilation contains that `Silo`; the Safe's nonce 19/20 redeems on the a768 vault
+  logged share transfers to a Sourcify-verified `Silo`. Judgment 2 accepted.
+- Oversight caught the detective comparing Transfer values with calldata argument words
+  (hand-decoding): removed. Tell detectives explicitly not to compare log values with
+  calldata.
+- My own brief wrongly said the other vault had "the same creator"; the prosecutor
+  correctly refused to assert it. Orchestrator briefs must not add facts.
+- The Safe Transaction Service returned "Monthly quota exceeded" (429) for
+  `transfers -all`; `executions -all` still worked an hour later. Record quota hits.
+- Another 5-hour usage-limit stop at ~18:00 UTC (reset 18:30); the judge was resumed
+  with SendMessage rather than restarted.
